@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#06436D"/>
+<title>Custom Report Generator — Workforce Junction</title>
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png"/>
+<link rel="stylesheet" href="assets/vendor/fonts/plus-jakarta-sans.css"/>
+<link rel="stylesheet" href="assets/vendor/fonts/fira-code.css"/>
+<link rel="stylesheet" href="assets/vendor/bootstrap-icons/bootstrap-icons.min.css"/>
+<link rel="stylesheet" href="assets/wj-shared.css"/>
+<style>
+  .wj-desktop-notice{
+    display:none;background:var(--wj-amb-lt);border:1px solid #F3D8A8;color:#8A5A00;border-radius:10px;
+    padding:.8rem 1rem;font-size:.82rem;margin-bottom:1rem;
+  }
+  .field-in{width:100%;padding:.6rem .7rem;border-radius:8px;border:1px solid var(--wj-border);font-family:var(--wj-mono);font-size:.85rem}
+</style>
+</head>
+<body>
+<div id="wj-nav-mount"></div>
+
+<div class="wj-page">
+  <div class="wj-page-hdr">
+    <div class="wj-eyebrow"><i class="bi bi-robot"></i> Portal Automation</div>
+    <h1 class="wj-page-title">Custom Report Generator</h1>
+    <p class="wj-page-sub">Drives the BenefitsJunction admin portal end-to-end to build and download a
+      Demographics report — same steps as the original automation, now just fill in the fields below
+      instead of hand-editing the script.</p>
+  </div>
+
+  <div id="desktop-notice" class="wj-desktop-notice">
+    <i class="bi bi-exclamation-triangle"></i> This tool needs the desktop app's Python/Selenium backend —
+    open it from the Workforce Junction application window instead of a plain browser tab.
+  </div>
+
+  <div class="wj-card">
+    <div class="wj-card-hdr"><i class="bi bi-gear"></i> Configuration</div>
+    <div class="wj-card-body">
+      <div class="wj-grid-2">
+        <div>
+          <label class="wj-field-lbl">Edge WebDriver Path</label>
+          <div style="display:flex;gap:.5rem;margin-bottom:1rem">
+            <input id="driver-path" class="field-in" type="text" readonly
+              value="C:\Users\kiran.bs\Downloads\edgedriver_win64\msedgedriver.exe"/>
+            <button class="wj-btn wj-btn-ghost" id="btn-browse-driver"><i class="bi bi-folder2-open"></i></button>
+          </div>
+        </div>
+        <div>
+          <label class="wj-field-lbl">Portal URL</label>
+          <input id="portal-url" class="field-in" type="text" value="https://admin.benefitsjunction.com/" style="margin-bottom:1rem"/>
+        </div>
+        <div>
+          <label class="wj-field-lbl">Username</label>
+          <input id="username" class="field-in" type="text" style="margin-bottom:1rem"/>
+        </div>
+        <div>
+          <label class="wj-field-lbl">Password</label>
+          <input id="password" class="field-in" type="password" style="margin-bottom:1rem"/>
+        </div>
+        <div>
+          <label class="wj-field-lbl">Client Name <span style="font-weight:400;color:var(--wj-txt3)">(must match dropdown exactly)</span></label>
+          <input id="client-name" class="field-in" type="text" value="W.T.Rich" style="margin-bottom:1rem"/>
+        </div>
+        <div>
+          <label class="wj-field-lbl">Report Name</label>
+          <input id="report-name" class="field-in" type="text" value="WFJ Metal Pros LLC Demographics Report" style="margin-bottom:1rem"/>
+        </div>
+        <div>
+          <label class="wj-field-lbl">Report Effective Date <span style="font-weight:400;color:var(--wj-txt3)">(M/D/YYYY)</span></label>
+          <input id="report-date" class="field-in" type="text" value="10/1/2025" style="margin-bottom:1rem"/>
+        </div>
+      </div>
+
+      <div style="margin-top:.4rem;display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+        <button class="wj-btn wj-btn-primary" id="btn-run"><i class="bi bi-play-fill"></i> Run Report Generation</button>
+        <button class="wj-btn wj-btn-ghost" id="btn-clear"><i class="bi bi-eraser"></i> Clear Log</button>
+        <span id="run-status" style="font-size:.8rem;color:var(--wj-txt2)">Ready — fill in the fields above and run</span>
+      </div>
+
+      <div id="run-log" class="wj-log" style="margin-top:.9rem"></div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/wj-shared.js"></script>
+<script>
+wjRenderNav('custom-report-generator.html');
+
+let running=false;
+
+function appendLog(msg,tag){
+  const el=document.getElementById('run-log');
+  const line=document.createElement('div');
+  line.className=tag||'info';
+  line.textContent=msg;
+  el.appendChild(line);
+  el.scrollTop=el.scrollHeight;
+}
+function setStatus(msg,kind){
+  const el=document.getElementById('run-status');
+  el.textContent=msg;
+  el.style.color= kind==='err'? 'var(--wj-red)' : kind==='ok'? 'var(--wj-grn)' : 'var(--wj-txt2)';
+}
+
+window.wjLog=appendLog;
+window.wjStatus=setStatus;
+window.wjReportFinished=function(){
+  running=false;
+  document.getElementById('btn-run').disabled=false;
+  document.getElementById('btn-run').innerHTML='<i class="bi bi-play-fill"></i> Run Report Generation';
+};
+
+document.getElementById('btn-browse-driver').addEventListener('click',async ()=>{
+  if(!(window.top.pywebview && window.top.pywebview.api)) return;
+  const path=await window.top.pywebview.api.pick_driver_file();
+  if(path) document.getElementById('driver-path').value=path;
+});
+
+document.getElementById('btn-clear').addEventListener('click',()=>{
+  document.getElementById('run-log').innerHTML='';
+  setStatus('Log cleared.');
+});
+
+document.getElementById('btn-run').addEventListener('click',async ()=>{
+  if(running) return;
+  const params={
+    driver_path: document.getElementById('driver-path').value.trim(),
+    portal_url: document.getElementById('portal-url').value.trim(),
+    username: document.getElementById('username').value,
+    password: document.getElementById('password').value,
+    client_name: document.getElementById('client-name').value.trim(),
+    report_name: document.getElementById('report-name').value.trim(),
+    report_date: document.getElementById('report-date').value.trim(),
+  };
+  if(!params.driver_path || !params.username || !params.password){
+    wjToast('Please fill in the driver path, username, and password.','err'); return;
+  }
+  running=true;
+  document.getElementById('btn-run').disabled=true;
+  document.getElementById('btn-run').innerHTML='<i class="bi bi-hourglass-split"></i> Running...';
+  await window.top.pywebview.api.run_custom_report(params);
+});
+
+wjOnApiReady(()=>{ document.getElementById('desktop-notice').style.display='none'; });
+setTimeout(()=>{
+  if(!(window.top.pywebview && window.top.pywebview.api)) document.getElementById('desktop-notice').style.display='block';
+},1200);
+</script>
+</body>
+</html>

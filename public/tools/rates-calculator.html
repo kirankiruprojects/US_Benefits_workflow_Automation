@@ -1,0 +1,2473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Employee Insurance Rate Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<style>
+:root{
+  --sw:252px;
+  --c1:#0F1C3F;--c2:#162252;--c3:#1E2F6A;
+  --acc:#3B6FE8;--acc2:#2855C4;--acc-lt:#EBF0FE;--acc-glow:rgba(59,111,232,.25);
+  --grn:#12A06A;--grn-lt:#E6F8F2;--grn-dk:#0A7A50;
+  --amb:#D97706;--amb-lt:#FEF3C7;
+  --pur:#7C3AED;--pur-lt:#EDE9FE;--pur-dk:#5B21B6;
+  --tel:#0D8F87;--tel-lt:#E6F7F6;
+  --red:#DC2626;--red-lt:#FEE2E2;
+  --bg:#F0F4FB;--card:#FFFFFF;--border:#DDE3EE;
+  --txt:#111827;--txt2:#4B5563;--txt3:#9CA3AF;
+  --shadow:0 1px 3px rgba(15,28,63,.08),0 4px 16px rgba(15,28,63,.06);
+  --shadow-lg:0 8px 32px rgba(15,28,63,.14);
+  --r:10px;--font:'Plus Jakarta Sans',sans-serif;--mono:'Fira Code',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--txt);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+
+/* ═══ SIDEBAR ═══ */
+#sidebar{
+  position:fixed;left:0;top:0;bottom:0;width:var(--sw);
+  background:var(--c1);z-index:300;display:flex;flex-direction:column;
+  overflow-y:auto;overflow-x:hidden;
+  border-right:1px solid rgba(255,255,255,.05);
+}
+#sidebar::-webkit-scrollbar{width:3px}
+#sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
+
+.slogo{
+  padding:1rem 1.1rem .9rem;border-bottom:1px solid rgba(255,255,255,.06);
+  display:flex;align-items:center;gap:.7rem;text-decoration:none;
+}
+.slogo-icon{
+  width:36px;height:36px;border-radius:9px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--acc),#5B8FFF);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 8px var(--acc-glow);
+}
+.slogo-icon i{color:#fff;font-size:1.1rem}
+.slogo-text .t1{font-size:.85rem;font-weight:800;color:#E8EFF8;letter-spacing:-.02em}
+.slogo-text .t2{font-size:.6rem;color:#4A6080;font-weight:500;letter-spacing:.04em;margin-top:1px}
+
+.snav{padding:.6rem 0}
+.snav-lbl{
+  padding:.55rem 1.1rem .2rem;font-size:.58rem;font-weight:700;
+  color:#2E4A6A;letter-spacing:.14em;text-transform:uppercase;
+}
+.snav-parent{
+  display:flex;align-items:center;gap:.5rem;padding:.42rem 1rem;
+  color:#6B85A8;font-size:.77rem;font-weight:600;cursor:pointer;
+  margin:1px 8px;border-radius:7px;transition:all .15s;user-select:none;
+}
+.snav-parent:hover{background:rgba(255,255,255,.05);color:#A0B8D4}
+.snav-parent.open{color:#90B4E0;background:rgba(59,111,232,.12)}
+.snav-parent i.ic{font-size:.9rem;width:.95rem}
+.snav-arrow{margin-left:auto;font-size:.7rem;transition:transform .22s;opacity:.6}
+.snav-parent.open .snav-arrow{transform:rotate(180deg);opacity:1}
+
+.snav-children{
+  overflow:hidden;max-height:0;transition:max-height .25s ease;
+}
+.snav-parent.open + .snav-children{max-height:300px}
+.snav-child{
+  display:flex;align-items:center;gap:.45rem;
+  padding:.36rem .85rem .36rem 2.3rem;
+  color:#4A6080;font-size:.73rem;font-weight:500;cursor:pointer;
+  border-radius:6px;margin:1px 8px 1px 16px;transition:all .15s;text-decoration:none;
+  position:relative;
+}
+.snav-child::before{
+  content:'';position:absolute;left:-.4rem;top:50%;transform:translateY(-50%);
+  width:0;height:60%;background:var(--acc);border-radius:2px;transition:width .15s;
+}
+.snav-child:hover{color:#A0B8D4;background:rgba(255,255,255,.04)}
+.snav-child.active{color:#7AB0FF;background:rgba(59,111,232,.15)}
+.snav-child.active::before{width:3px}
+.snav-child i{font-size:.8rem;width:.85rem}
+
+.sfooter{margin-top:auto;padding:.8rem;border-top:1px solid rgba(255,255,255,.05)}
+.btn-export-main{
+  width:100%;padding:.6rem;font-size:.75rem;font-weight:700;
+  background:linear-gradient(135deg,var(--grn),#0E8F5E);color:#fff;
+  border:none;border-radius:8px;font-family:var(--font);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:.45rem;
+  transition:opacity .15s;box-shadow:0 2px 8px rgba(18,160,106,.35);
+}
+.btn-export-main:hover{opacity:.88}
+
+/* ═══ MAIN ═══ */
+#main{margin-left:var(--sw);display:flex;flex-direction:column;min-height:100vh}
+
+.topbar{
+  position:sticky;top:0;z-index:200;
+  background:rgba(240,244,251,.92);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+  padding:.6rem 1.4rem;display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;
+}
+.topbar-field{display:flex;flex-direction:column;gap:.14rem}
+.topbar-field label{font-size:.6rem;font-weight:700;color:var(--txt3);letter-spacing:.08em;text-transform:uppercase}
+.topbar-field input{
+  height:30px;border:1px solid var(--border);border-radius:6px;
+  padding:0 .55rem;font-size:.8rem;font-family:var(--font);color:var(--txt);
+  background:#fff;outline:none;transition:border .15s;min-width:160px;
+}
+.topbar-field input:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-lt)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:.5rem}
+.app-title{
+  font-size:.88rem;font-weight:800;color:var(--c1);letter-spacing:-.02em;
+  display:flex;align-items:center;gap:.4rem;
+}
+.app-title span{color:var(--acc)}
+
+.breadbar{
+  background:#fff;border-bottom:1px solid var(--border);
+  padding:.38rem 1.4rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
+}
+.bc{font-size:.7rem;color:var(--txt3);font-weight:500;cursor:pointer;transition:color .15s}
+.bc:hover{color:var(--acc)}
+.bc.active{color:var(--acc);font-weight:700}
+.bc-sep{font-size:.65rem;color:#D1D9E6}
+.undo-bar{margin-left:auto;display:flex;align-items:center;gap:.4rem}
+.btn-undo,.btn-redo{
+  width:28px;height:28px;border-radius:6px;border:1px solid var(--border);
+  background:#fff;color:var(--txt2);cursor:pointer;font-size:.85rem;
+  display:flex;align-items:center;justify-content:center;transition:all .15s;
+}
+.btn-undo:hover,.btn-redo:hover{background:var(--acc-lt);color:var(--acc);border-color:var(--acc)}
+.btn-undo:disabled,.btn-redo:disabled{opacity:.35;cursor:not-allowed}
+.undo-count{font-size:.65rem;color:var(--txt3);font-weight:600}
+
+#content{flex:1;padding:1.2rem 1.4rem;display:flex;flex-direction:column;gap:1.2rem}
+
+/* ═══ SECTION ═══ */
+.sec{background:var(--card);border-radius:14px;border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden}
+.sec-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.7rem 1.15rem;font-weight:700;font-size:.84rem;
+  border-bottom:1px solid var(--border);
+}
+.sec-hdr.blue{background:linear-gradient(90deg,var(--c3),var(--acc));color:#fff}
+.sec-hdr.amber{background:linear-gradient(90deg,#92400E,var(--amb));color:#fff}
+.sec-hdr.purple{background:linear-gradient(90deg,var(--pur-dk),var(--pur));color:#fff}
+.sec-hdr.teal{background:linear-gradient(90deg,#075F5A,var(--tel));color:#fff}
+.sec-hdr-title{display:flex;align-items:center;gap:.5rem}
+.sec-hdr-title i{font-size:1rem;opacity:.9}
+.sec-hdr-actions{display:flex;align-items:center;gap:.4rem}
+.btn-add{
+  background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.28);
+  border-radius:6px;padding:.26rem .6rem;font-size:.71rem;font-weight:700;
+  cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:.28rem;
+  transition:all .15s;
+}
+.btn-add:hover{background:rgba(255,255,255,.32)}
+.sec-body{padding:.9rem 1rem;display:flex;flex-direction:column;gap:.75rem}
+
+/* ═══ CALC CARD ═══ */
+.ccard{
+  border:1px solid var(--border);border-radius:10px;overflow:hidden;
+  box-shadow:0 1px 4px rgba(15,28,63,.05);transition:box-shadow .2s;
+}
+.ccard:hover{box-shadow:var(--shadow)}
+.ccard-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.48rem .95rem;font-weight:700;font-size:.78rem;color:#fff;
+}
+.ccard-hdr.blue{background:linear-gradient(90deg,var(--acc2),var(--acc))}
+.ccard-hdr.amber{background:linear-gradient(90deg,#7A3800,#D97706)}
+.ccard-hdr.purple{background:linear-gradient(90deg,#4A1270,#7C3AED)}
+.ccard-hdr.teal{background:linear-gradient(90deg,#054540,#0D8F87)}
+.ccard-hdr-left{display:flex;align-items:center;gap:.45rem}
+.ccard-hdr-right{display:flex;align-items:center;gap:.35rem}
+.btn-remove{
+  background:rgba(255,255,255,.12);color:rgba(255,255,255,.85);
+  border:1px solid rgba(255,255,255,.2);border-radius:5px;
+  padding:.18rem .45rem;font-size:.67rem;font-weight:600;cursor:pointer;
+  font-family:var(--font);transition:all .15s;
+}
+.btn-remove:hover{background:rgba(220,38,38,.5);border-color:rgba(220,38,38,.6)}
+.btn-save-card{
+  background:rgba(18,160,106,.25);color:#7EEDC4;
+  border:1px solid rgba(18,160,106,.4);border-radius:5px;
+  padding:.18rem .45rem;font-size:.7rem;cursor:pointer;
+  display:flex;align-items:center;gap:.25rem;transition:all .15s;font-weight:600;font-family:var(--font);
+}
+.btn-save-card:hover{background:rgba(18,160,106,.45);color:#fff}
+.btn-save-card i{font-size:.82rem}
+.ccard-body{padding:.85rem .95rem;background:#FAFBFE}
+
+/* ═══ FORM ═══ */
+.config-panel{background:#fff;border:1px solid var(--border);border-radius:8px;padding:.7rem .9rem;margin-bottom:.7rem}
+label.lbl{display:block;font-size:.6rem;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem}
+input.inp,select.inp{
+  width:100%;height:30px;border:1px solid var(--border);border-radius:6px;
+  padding:0 .55rem;font-size:.78rem;font-family:var(--font);color:var(--txt);
+  background:#fff;outline:none;transition:all .15s;
+}
+input.inp:focus,select.inp:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-lt)}
+input.inp::placeholder{color:#C5CDD8}
+.rg{display:flex;gap:.65rem;flex-wrap:wrap;margin-top:.12rem}
+.rg label{display:flex;align-items:center;gap:.28rem;cursor:pointer;font-size:.76rem;color:var(--txt)}
+.rg input[type=radio]{accent-color:var(--acc)}
+.chk-lbl{display:flex;align-items:center;gap:.3rem;cursor:pointer;font-size:.76rem;color:var(--txt)}
+.chk-lbl input{accent-color:var(--acc);width:14px;height:14px}
+
+/* ═══ SALARY TAB SWITCHER ═══ */
+.sal-tabs{display:flex;gap:0;border:1px solid var(--amb);border-radius:7px;overflow:hidden;margin-bottom:.65rem}
+.sal-tab{
+  flex:1;padding:.28rem .7rem;font-size:.72rem;font-weight:700;
+  background:#fff;color:var(--amb);cursor:pointer;border:none;
+  font-family:var(--font);transition:all .16s;display:flex;align-items:center;justify-content:center;gap:.3rem;
+  border-right:1px solid var(--amb);
+}
+.sal-tab:last-child{border-right:none}
+.sal-tab.active{background:var(--amb);color:#fff}
+.sal-tab:hover:not(.active){background:var(--amb-lt)}
+.sal-panel{display:none}.sal-panel.active{display:block}
+.hourly-badge{
+  display:inline-flex;align-items:center;gap:.3rem;
+  background:#FEF3C7;border:1px solid #FCD34D;border-radius:5px;
+  padding:.18rem .5rem;font-size:.68rem;font-weight:700;color:#92400E;
+}
+
+/* ═══ ROUNDING RULE ═══ */
+.rounding-row{
+  display:flex;align-items:center;gap:.55rem;
+  background:var(--amb-lt);border:1px solid #FCD34D;border-radius:7px;
+  padding:.38rem .75rem;margin-top:.5rem;flex-wrap:wrap;
+}
+.rounding-row label.lbl{margin-bottom:0;white-space:nowrap;flex-shrink:0}
+.rounding-row select.inp{width:auto;min-width:240px;flex:1}
+.rounding-badge{
+  font-size:.65rem;font-weight:700;color:#92400E;
+  background:#FEF3C7;border:1px solid #FCD34D;border-radius:4px;
+  padding:2px 7px;white-space:nowrap;
+}
+
+/* ═══ RATE-BASE TOGGLE ═══ */
+.rate-base-toggle{
+  display:inline-flex;align-items:center;gap:0;
+  border:1px solid var(--amb);border-radius:7px;overflow:hidden;
+  background:#fff;
+}
+.rate-base-toggle label{
+  display:flex;align-items:center;gap:.3rem;
+  padding:.22rem .65rem;font-size:.72rem;font-weight:700;
+  cursor:pointer;transition:all .16s;color:var(--amb);user-select:none;
+  border-right:1px solid var(--amb);
+}
+.rate-base-toggle label:last-child{border-right:none}
+.rate-base-toggle input[type=radio]{display:none}
+.rate-base-toggle input[type=radio]:checked + span{/* handled via JS class */}
+.rate-base-toggle label.rb-active{
+  background:var(--amb);color:#fff;
+}
+.rate-base-pill{
+  display:inline-flex;align-items:center;gap:.35rem;
+  background:var(--amb-lt);border:1px solid #FCD34D;
+  border-radius:6px;padding:.2rem .55rem;
+  font-size:.65rem;font-weight:700;color:#92400E;
+}
+.rate-base-pill i{font-size:.78rem}
+
+/* ═══ SHARED RATE PANEL ═══ */
+.shared-panel{
+  background:linear-gradient(135deg,#EBF0FE,#F5F8FF);
+  border:1px solid #C5D3F5;border-radius:8px;padding:.7rem .9rem;margin-bottom:.7rem;
+}
+.shared-panel-hdr{
+  font-size:.63rem;font-weight:800;color:var(--acc2);text-transform:uppercase;
+  letter-spacing:.09em;margin-bottom:.55rem;display:flex;align-items:center;gap:.35rem;
+}
+.shared-panel-hdr i{font-size:.9rem}
+.shared-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:.5rem .7rem}
+.srate-grp{display:flex;flex-direction:column;gap:.15rem}
+.srate-grp label{font-size:.58rem;font-weight:700;color:var(--acc2);text-transform:uppercase;letter-spacing:.06em}
+.srate-grp input{
+  height:30px;border:1px solid #9DB8F0;border-radius:6px;
+  padding:0 .55rem;font-size:.82rem;font-family:var(--mono);font-weight:500;
+  color:var(--acc2);background:#fff;outline:none;transition:border .15s;text-align:right;
+}
+.srate-grp input:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-lt)}
+.shared-actions{display:flex;gap:.5rem;margin-top:.55rem;align-items:center;flex-wrap:wrap}
+.badge-auto{font-size:.62rem;color:#6B85A8;background:#EBF0FE;border:1px solid #C5D3F5;border-radius:4px;padding:2px 7px;font-weight:600}
+
+/* ═══ TIER TABLE ═══ */
+.tier-wrap{border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.tier-hdr{
+  display:grid;background:#F3F6FB;padding:.35rem .8rem;
+  font-size:.6rem;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;
+  border-bottom:1px solid var(--border);
+}
+.tier-row{
+  display:grid;border-bottom:1px solid var(--border);
+  padding:.32rem .8rem;align-items:center;background:#fff;gap:.4rem;transition:background .12s;
+}
+.tier-row:last-child{border-bottom:none}
+.tier-row:hover{background:#F8FAFD}
+.tier-lbl{font-weight:700;color:var(--acc);font-size:.78rem;font-family:var(--font)}
+
+/* Result pills */
+.pill{
+  background:var(--grn-lt);border:1px solid #A7EDD0;border-radius:6px;
+  padding:.22rem .5rem;font-family:var(--mono);font-size:.76rem;font-weight:600;
+  color:var(--grn-dk);text-align:center;display:inline-block;min-width:80px;
+  transition:all .2s;
+}
+.pill.teal{background:var(--tel-lt);border-color:#9DDBD6;color:var(--tel)}
+.pill.blue{background:var(--acc-lt);border-color:#B3C9FA;color:var(--acc2)}
+.pill.amber{background:var(--amb-lt);border-color:#FCD34D;color:#92400E}
+.pill.flash{animation:flashpill .4s ease}
+@keyframes flashpill{0%{transform:scale(1)}50%{transform:scale(1.06);box-shadow:0 0 0 3px rgba(18,160,106,.25)}100%{transform:scale(1)}}
+
+/* ═══ RESULT ROW ═══ */
+.res-row{
+  background:var(--grn-lt);border:1px solid #A7EDD0;border-radius:8px;
+  padding:.55rem .9rem;margin-top:.55rem;display:flex;gap:.6rem;flex-wrap:wrap;
+  animation:fadeup .25s ease;
+}
+.res-row.amber{background:var(--amb-lt);border-color:#FCD34D}
+.res-row.teal{background:var(--tel-lt);border-color:#9DDBD6}
+@keyframes fadeup{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.res-cell{display:flex;flex-direction:column;gap:.1rem;flex:1;min-width:100px}
+.res-lbl{font-size:.58rem;font-weight:700;color:var(--grn-dk);text-transform:uppercase;letter-spacing:.08em}
+.res-lbl.amber{color:var(--amb)}
+.res-lbl.teal{color:var(--tel)}
+.res-val{font-family:var(--mono);font-size:.82rem;font-weight:600;color:var(--txt)}
+.res-val.big{font-size:.96rem;color:var(--acc);font-weight:700}
+.badge-cap{background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;border-radius:4px;padding:1px 5px;font-size:.62rem;font-weight:700;margin-left:4px}
+
+/* ═══ FORMULA NOTE ═══ */
+.fnote{
+  background:var(--acc-lt);border:1px solid #C5D3F5;border-radius:7px;
+  padding:.38rem .75rem;font-size:.71rem;color:var(--acc2);
+  margin-bottom:.6rem;display:flex;align-items:center;gap:.4rem;
+}
+.fnote.amber{background:var(--amb-lt);border-color:#FCD34D;color:#92400E}
+.fnote.teal{background:var(--tel-lt);border-color:#9DDBD6;color:var(--tel)}
+.fnote.purple{background:var(--pur-lt);border-color:#C4B5FD;color:var(--pur-dk)}
+
+/* ═══ REVERSE SMART WIZARD ═══ */
+.wizard-panel{
+  background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;
+}
+.wizard-step{
+  padding:.7rem .95rem;border-bottom:1px solid var(--border);
+  display:flex;align-items:flex-start;gap:.7rem;
+}
+.wizard-step:last-child{border-bottom:none}
+.step-num{
+  width:24px;height:24px;border-radius:50%;background:var(--acc);color:#fff;
+  font-size:.68rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  margin-top:.1rem;
+}
+.step-num.done{background:var(--grn)}
+.step-body{flex:1}
+.step-title{font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:.4rem}
+.step-desc{font-size:.7rem;color:var(--txt2);margin-bottom:.45rem}
+.known-selector{display:flex;gap:.4rem;flex-wrap:wrap}
+.btn-known{
+  padding:.28rem .65rem;border:1px solid var(--border);border-radius:6px;
+  background:#fff;color:var(--txt2);font-size:.73rem;font-weight:600;cursor:pointer;
+  font-family:var(--font);transition:all .15s;
+}
+.btn-known:hover{border-color:var(--acc);color:var(--acc);background:var(--acc-lt)}
+.btn-known.sel{border-color:var(--acc);color:var(--acc);background:var(--acc-lt)}
+.calc-area{display:none;padding:.5rem 0 0}
+.calc-area.show{display:block;animation:fadeup .2s ease}
+
+/* ═══ BUTTONS ═══ */
+.btn{
+  display:inline-flex;align-items:center;gap:.3rem;
+  padding:.35rem .75rem;border-radius:7px;font-size:.74rem;font-weight:700;
+  cursor:pointer;font-family:var(--font);border:none;transition:all .15s;
+}
+.btn-grn{background:var(--grn);color:#fff}.btn-grn:hover{background:var(--grn-dk)}
+.btn-blu{background:var(--acc);color:#fff}.btn-blu:hover{background:var(--acc2)}
+.btn-amb{background:var(--amb);color:#fff}.btn-amb:hover{background:#B45309}
+.btn-tel{background:var(--tel);color:#fff}.btn-tel:hover{background:#0A6B65}
+.btn-pur{background:var(--pur);color:#fff}.btn-pur:hover{background:var(--pur-dk)}
+.btn-out{background:transparent;color:var(--tel);border:1px solid var(--tel)}.btn-out:hover{background:var(--tel);color:#fff}
+.btn-sm{padding:.22rem .5rem;font-size:.69rem}
+
+/* ═══ TOAST ═══ */
+#toast-container{position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem}
+.toast{
+  background:var(--c1);color:#E8EFF8;padding:.55rem 1rem;border-radius:9px;
+  font-size:.77rem;font-weight:600;display:flex;align-items:center;gap:.5rem;
+  box-shadow:var(--shadow-lg);animation:toastin .3s ease;pointer-events:none;
+  border-left:3px solid var(--grn);min-width:200px;
+}
+.toast.err{border-left-color:var(--red)}
+.toast.info{border-left-color:var(--acc)}
+@keyframes toastin{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+@keyframes toastout{to{opacity:0;transform:translateX(20px)}}
+
+/* ═══ SAVE MODAL ═══ */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(15,28,63,.55);backdrop-filter:blur(4px);
+  z-index:500;display:flex;align-items:center;justify-content:center;
+  animation:fadein .2s ease;
+}
+.modal-overlay.hidden{display:none}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+.modal-box{
+  background:#fff;border-radius:14px;box-shadow:var(--shadow-lg);
+  width:420px;max-width:95vw;overflow:hidden;
+  animation:scalein .2s ease;
+}
+@keyframes scalein{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+.modal-hdr{
+  padding:.8rem 1.1rem;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);
+  background:linear-gradient(90deg,var(--grn-dk),var(--grn));
+}
+.modal-hdr-title{color:#fff;font-weight:700;font-size:.88rem;display:flex;align-items:center;gap:.4rem}
+.modal-close{background:rgba(255,255,255,.2);border:none;color:#fff;width:24px;height:24px;border-radius:5px;cursor:pointer;font-size:.9rem;display:flex;align-items:center;justify-content:center}
+.modal-body{padding:1.1rem}
+.modal-footer{padding:.75rem 1.1rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:.5rem;background:#F8FAFD}
+
+/* ═══ VOL LIFE SCROLL ═══ */
+.scroll-wrap{max-height:260px;overflow-y:auto}
+.scroll-wrap::-webkit-scrollbar{width:3px}
+.scroll-wrap::-webkit-scrollbar-thumb{background:#D0DAE8;border-radius:3px}
+
+/* ═══ CHILD TIER ROWS ═══ */
+.ch-subrow{
+  display:grid;border-bottom:1px solid var(--border);
+  padding:.28rem .8rem .28rem 2.2rem;align-items:center;
+  background:#F5F8FF;gap:.4rem;transition:background .12s;
+  border-left:3px solid var(--acc-lt);
+}
+.ch-subrow:hover{background:#EEF3FF}
+.ch-subrow:last-child{border-bottom:none}
+.ch-lbl{font-size:.74rem;font-weight:600;color:var(--acc2);display:flex;align-items:center;gap:.3rem}
+.ch-lbl i{font-size:.72rem;opacity:.6}
+.add-child-row{
+  display:flex;align-items:center;gap:.5rem;
+  padding:.32rem .8rem .32rem 2.2rem;background:#F8FAFD;
+  border-bottom:1px solid var(--border);cursor:pointer;
+  border-left:3px solid transparent;transition:all .15s;
+}
+.add-child-row:hover{background:var(--acc-lt);border-left-color:var(--acc)}
+.add-child-row span{font-size:.71rem;font-weight:600;color:var(--acc);display:flex;align-items:center;gap:.3rem}
+.ch-total-row{
+  display:grid;padding:.38rem .8rem;align-items:center;gap:.4rem;
+  background:linear-gradient(90deg,#EBF0FE,#F5F8FF);
+  border-top:2px solid var(--acc-lt);border-bottom:1px solid var(--border);
+}
+.ch-total-lbl{font-size:.68rem;font-weight:800;color:var(--acc2);text-transform:uppercase;letter-spacing:.06em}
+.ch-section-hdr{
+  display:grid;background:#E6ECF8;padding:.3rem .8rem .3rem 2.2rem;
+  font-size:.6rem;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;
+  border-bottom:1px solid var(--border);border-left:3px solid var(--acc-lt);
+}
+
+.hidden{display:none!important}
+.row{display:flex;flex-wrap:wrap;margin:0 -.35rem}
+.row>[class^=col]{padding:0 .35rem}
+.col-auto{flex:0 0 auto;width:auto}
+.col-1{flex:0 0 8.33%;max-width:8.33%}
+.col-2{flex:0 0 16.67%;max-width:16.67%}
+.col-3{flex:0 0 25%;max-width:25%}
+.col-4{flex:0 0 33.33%;max-width:33.33%}
+.col-5{flex:0 0 41.67%;max-width:41.67%}
+.col-6{flex:0 0 50%;max-width:50%}
+.col-8{flex:0 0 66.67%;max-width:66.67%}
+.col-12{flex:0 0 100%;max-width:100%}
+.mb-2{margin-bottom:.5rem}.mb-3{margin-bottom:.75rem}.mt-2{margin-top:.5rem}.mt-3{margin-top:.75rem}
+.ms-auto{margin-left:auto}.d-flex{display:flex}.align-items-center{align-items:center}.gap-2{gap:.5rem}.gap-3{gap:.75rem}.flex-wrap{flex-wrap:wrap}.justify-content-end{justify-content:flex-end}.text-end{text-align:right}
+.w-100{width:100%}.pt-3{padding-top:.75rem}
+</style>
+</head>
+<body>
+
+<!-- TOAST CONTAINER -->
+<div id="toast-container"></div>
+
+<!-- SAVE MODAL -->
+<div class="modal-overlay hidden" id="save-modal">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <div class="modal-hdr-title"><i class="bi bi-file-earmark-excel"></i> Save to Excel</div>
+      <button class="modal-close" onclick="closeModal()"><i class="bi bi-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="mb-3">
+        <label class="lbl">Sheet / File Name</label>
+        <input class="inp" id="modal-fname" placeholder="Rate_Calculation"/>
+      </div>
+      <div class="mb-3">
+        <label class="lbl">Section</label>
+        <input class="inp" id="modal-section" readonly/>
+      </div>
+      <p style="font-size:.73rem;color:var(--txt2)">This will download an Excel (.xlsx) file with all entered data and calculated results for this calculation card.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" style="background:var(--border);color:var(--txt2)" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-grn" onclick="doSave()"><i class="bi bi-file-earmark-excel"></i> Download Excel</button>
+    </div>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<nav id="sidebar">
+  <div class="slogo">
+    <div class="slogo-icon"><i class="bi bi-shield-check"></i></div>
+    <div class="slogo-text">
+      <div class="t1">Rate_Calculator</div>
+      <div class="t2">EMPLOYEE INSURANCE RATES</div>
+    </div>
+  </div>
+  <div class="snav">
+    <div class="snav-lbl">Forward Calculations</div>
+    <div class="snav-parent" onclick="toggleNav(this)" data-group="tier">
+      <i class="bi bi-layers ic"></i> Tier Coverage
+      <i class="bi bi-chevron-down snav-arrow"></i>
+    </div>
+    <div class="snav-children">
+      <a class="snav-child" onclick="go('medical');return false" href="#"><i class="bi bi-heart-pulse"></i> Medical</a>
+      <a class="snav-child" onclick="go('dental');return false" href="#"><i class="bi bi-emoji-smile"></i> Dental</a>
+      <a class="snav-child" onclick="go('vision');return false" href="#"><i class="bi bi-eye"></i> Vision</a>
+      <a class="snav-child" onclick="go('accident');return false" href="#"><i class="bi bi-bandaid"></i> Accident</a>
+    </div>
+    <div class="snav-parent" onclick="toggleNav(this)" data-group="custom">
+      <i class="bi bi-clipboard2-pulse ic"></i> Disability Plans
+      <i class="bi bi-chevron-down snav-arrow"></i>
+    </div>
+    <div class="snav-children">
+      <a class="snav-child" onclick="go('std');return false" href="#"><i class="bi bi-calendar-week"></i> STD</a>
+      <a class="snav-child" onclick="go('ltd');return false" href="#"><i class="bi bi-calendar-month"></i> LTD</a>
+    </div>
+    <div class="snav-parent" onclick="toggleNav(this)" data-group="incr">
+      <i class="bi bi-graph-up-arrow ic"></i> Incremental Plans
+      <i class="bi bi-chevron-down snav-arrow"></i>
+    </div>
+    <div class="snav-children">
+      <a class="snav-child" onclick="go('vollife');return false" href="#"><i class="bi bi-briefcase"></i> Voluntary Life</a>
+      <a class="snav-child" onclick="go('ci');return false" href="#"><i class="bi bi-activity"></i> Critical Illness</a>
+    </div>
+    <div class="snav-lbl" style="margin-top:.6rem">Reverse Calculations</div>
+    <div class="snav-parent" onclick="toggleNav(this)" data-group="rev">
+      <i class="bi bi-arrow-left-right ic"></i> Reverse Tools
+      <i class="bi bi-chevron-down snav-arrow"></i>
+    </div>
+    <div class="snav-children">
+      <a class="snav-child" onclick="go('rev_tier');return false" href="#"><i class="bi bi-arrow-left-right"></i> Tier Reverse</a>
+      <a class="snav-child" onclick="go('rev_stdltd');return false" href="#"><i class="bi bi-arrow-left-right"></i> STD/LTD Reverse</a>
+      <a class="snav-child" onclick="go('rev_incr');return false" href="#"><i class="bi bi-arrow-left-right"></i> Vol Life Reverse</a>
+    </div>
+  </div>
+  <div class="sfooter">
+    <button class="btn-export-main" onclick="exportAllCSV()">
+      <i class="bi bi-file-earmark-spreadsheet"></i> Export All to Excel
+    </button>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div id="main">
+  <div class="topbar">
+    <div class="topbar-field">
+      <label>Company Name</label>
+      <input type="text" id="company-name" placeholder="Enter company name"/>
+    </div>
+    <div class="topbar-field">
+      <label>Effective Date</label>
+      <input type="date" id="eff-date"/>
+    </div>
+    <div class="topbar-right">
+      <div class="app-title"><i class="bi bi-shield-check" style="color:var(--acc)"></i> Employee<span>Rate</span> Calculator</div>
+    </div>
+  </div>
+  <div class="breadbar">
+    <span class="bc active" id="bc-root" onclick="go('all')">All Plans</span>
+    <span class="bc-sep" id="bc-sep1">›</span>
+    <span class="bc" id="bc-parent"></span>
+    <span class="bc-sep" id="bc-sep2" style="display:none">›</span>
+    <span class="bc active" id="bc-leaf" style="display:none"></span>
+    <div class="undo-bar">
+      <span class="undo-count" id="undo-count"></span>
+      <button class="btn-undo" id="btn-undo" title="Undo" onclick="undo()" disabled><i class="bi bi-arrow-counterclockwise"></i></button>
+      <button class="btn-redo" id="btn-redo" title="Redo" onclick="redo()" disabled><i class="bi bi-arrow-clockwise"></i></button>
+    </div>
+  </div>
+
+  <div id="content">
+    <div class="sec hidden" id="sec-medical">
+      <div class="sec-hdr blue">
+        <div class="sec-hdr-title"><i class="bi bi-heart-pulse"></i> Medical — Tier Coverage</div>
+        <div class="sec-hdr-actions"><button class="btn-add" onclick="addTier('medical-cards','Medical')"><i class="bi bi-plus-lg"></i> Add Calculation</button></div>
+      </div>
+      <div class="sec-body" id="medical-cards"></div>
+    </div>
+    <div class="sec hidden" id="sec-dental">
+      <div class="sec-hdr blue">
+        <div class="sec-hdr-title"><i class="bi bi-emoji-smile"></i> Dental — Tier Coverage</div>
+        <div class="sec-hdr-actions"><button class="btn-add" onclick="addTier('dental-cards','Dental')"><i class="bi bi-plus-lg"></i> Add Calculation</button></div>
+      </div>
+      <div class="sec-body" id="dental-cards"></div>
+    </div>
+    <div class="sec hidden" id="sec-vision">
+      <div class="sec-hdr blue">
+        <div class="sec-hdr-title"><i class="bi bi-eye"></i> Vision — Tier Coverage</div>
+        <div class="sec-hdr-actions"><button class="btn-add" onclick="addTier('vision-cards','Vision')"><i class="bi bi-plus-lg"></i> Add Calculation</button></div>
+      </div>
+      <div class="sec-body" id="vision-cards"></div>
+    </div>
+    <div class="sec hidden" id="sec-accident">
+      <div class="sec-hdr blue">
+        <div class="sec-hdr-title"><i class="bi bi-bandaid"></i> Accident — Tier Coverage</div>
+        <div class="sec-hdr-actions"><button class="btn-add" onclick="addTier('accident-cards','Accident')"><i class="bi bi-plus-lg"></i> Add Calculation</button></div>
+      </div>
+      <div class="sec-body" id="accident-cards"></div>
+    </div>
+    <div class="sec hidden" id="sec-std">
+      <div class="sec-hdr amber">
+        <div class="sec-hdr-title"><i class="bi bi-calendar-week"></i> STD — Short Term Disability</div>
+        <div class="sec-hdr-actions"><button class="btn-add" onclick="addSTDLTD('std-cards','STD')"><i class="bi bi-plus-lg"></i> Add Calculation</button></div>
+      </div>
+      <div class="sec-body" id="std-cards"></div>
+    </div>
+    <div class="sec hidden" id="sec-ltd">
+      <div class="sec-hdr amber">
+        <div class="sec-hdr-title"><i class="bi bi-calendar-month"></i> LTD — Long Term Disability</div>
+        <div class="sec-hdr-actions"><button class="btn-add" onclick="addSTDLTD('ltd-cards','LTD')"><i class="bi bi-plus-lg"></i> Add Calculation</button></div>
+      </div>
+      <div class="sec-body" id="ltd-cards"></div>
+    </div>
+    <div class="sec hidden" id="sec-vollife">
+      <div class="sec-hdr purple">
+        <div class="sec-hdr-title"><i class="bi bi-briefcase"></i> Voluntary Life</div>
+        <div class="sec-hdr-actions"><button class="btn-add" onclick="addVolLife('vollife-cards','Voluntary Life')"><i class="bi bi-plus-lg"></i> Add Calculation</button></div>
+      </div>
+      <div class="sec-body" id="vollife-cards"></div>
+    </div>
+    <div class="sec hidden" id="sec-ci">
+      <div class="sec-hdr purple">
+        <div class="sec-hdr-title"><i class="bi bi-activity"></i> Critical Illness</div>
+        <div class="sec-hdr-actions"><button class="btn-add" onclick="addVolLife('ci-cards','Critical Illness')"><i class="bi bi-plus-lg"></i> Add Calculation</button></div>
+      </div>
+      <div class="sec-body" id="ci-cards"></div>
+    </div>
+    <div class="sec hidden" id="sec-rev_tier">
+      <div class="sec-hdr teal">
+        <div class="sec-hdr-title"><i class="bi bi-arrow-left-right"></i> Reverse: Tier Coverage — Per-Pay → Monthly Rate</div>
+        <div class="sec-hdr-actions"><button class="btn-add" onclick="addRevTier()"><i class="bi bi-plus-lg"></i> Add Calculation</button></div>
+      </div>
+      <div class="sec-body" id="rev-tier-cards"></div>
+    </div>
+    <div class="sec hidden" id="sec-rev_stdltd">
+      <div class="sec-hdr teal">
+        <div class="sec-hdr-title"><i class="bi bi-arrow-left-right"></i> Reverse: STD / LTD — Smart Solver</div>
+        <div class="sec-hdr-actions"><button class="btn-add" onclick="addRevSTDLTD()"><i class="bi bi-plus-lg"></i> Add Calculation</button></div>
+      </div>
+      <div class="sec-body" id="rev-stdltd-cards"></div>
+    </div>
+    <div class="sec hidden" id="sec-rev_incr">
+      <div class="sec-hdr teal">
+        <div class="sec-hdr-title"><i class="bi bi-arrow-left-right"></i> Reverse: Vol Life / CI — Smart Solver</div>
+        <div class="sec-hdr-actions"><button class="btn-add" onclick="addRevIncr()"><i class="bi bi-plus-lg"></i> Add Calculation</button></div>
+      </div>
+      <div class="sec-body" id="rev-incr-cards"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════
+   CONSTANTS
+══════════════════════════════════════ */
+const PC={'Weekly (52)':52,'Bi-Weekly (26)':26,'Semi-Monthly (24)':24,'Monthly (12)':12,'Custom (48)':48};
+const TIERS4=['EE','EE+SP','EE+CH','EE+Family'];
+let cnt={};
+function nid(ns){cnt[ns]=(cnt[ns]||0)+1;return cnt[ns];}
+function sf(v){const x=parseFloat(String(v||'').replace(/[$,]/g,''));return isNaN(x)||x<0?0:x;}
+function perPay(m,pc){return pc?m*12/pc:0;}
+function moFromPP(pp,pc){return pc?pp*pc/12:0;}
+function getPCValue(sel){return PC[sel]||26;}
+function pcOpts(sel){
+  sel=sel||'Bi-Weekly (26)';
+  return Object.keys(PC).map(k=>`<option value="${k}"${k===sel?' selected':''}>${k}</option>`).join('');
+}
+function fmt(n,d=4){return '$'+n.toFixed(d);}
+
+/* ══════════════════════════════════════
+   UNDO / REDO
+══════════════════════════════════════ */
+let undoStack=[], redoStack=[], _snapBusy=false;
+function snapshot(){
+  if(_snapBusy)return;
+  const html=document.getElementById('content').innerHTML;
+  undoStack.push(html);
+  if(undoStack.length>40)undoStack.shift();
+  redoStack=[];
+  updateUndoUI();
+}
+function undo(){
+  if(undoStack.length<2)return;
+  const cur=undoStack.pop();
+  redoStack.push(cur);
+  _snapBusy=true;
+  document.getElementById('content').innerHTML=undoStack[undoStack.length-1];
+  _snapBusy=false;
+  updateUndoUI();
+  toast('Undo applied','info');
+}
+function redo(){
+  if(!redoStack.length)return;
+  const h=redoStack.pop();
+  undoStack.push(h);
+  _snapBusy=true;
+  document.getElementById('content').innerHTML=h;
+  _snapBusy=false;
+  updateUndoUI();
+  toast('Redo applied','info');
+}
+function updateUndoUI(){
+  const u=document.getElementById('btn-undo'),r=document.getElementById('btn-redo'),c=document.getElementById('undo-count');
+  u.disabled=undoStack.length<2;r.disabled=!redoStack.length;
+  c.textContent=undoStack.length>1?`${undoStack.length-1} steps`:'';
+}
+
+/* ══════════════════════════════════════
+   TOAST
+══════════════════════════════════════ */
+function toast(msg,type='success'){
+  const t=document.createElement('div');t.className=`toast ${type==='err'?'err':type==='info'?'info':''}`;
+  const icon=type==='err'?'bi-x-circle':type==='info'?'bi-info-circle':'bi-check-circle';
+  t.innerHTML=`<i class="bi ${icon}"></i>${msg}`;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(()=>{t.style.animation='toastout .3s ease forwards';setTimeout(()=>t.remove(),300)},2500);
+}
+
+/* ══════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════ */
+const SECMAP={
+  medical:{parent:'Tier Coverage',label:'Medical',group:'tier'},
+  dental:{parent:'Tier Coverage',label:'Dental',group:'tier'},
+  vision:{parent:'Tier Coverage',label:'Vision',group:'tier'},
+  accident:{parent:'Tier Coverage',label:'Accident',group:'tier'},
+  std:{parent:'Custom Plans',label:'STD',group:'custom'},
+  ltd:{parent:'Custom Plans',label:'LTD',group:'custom'},
+  vollife:{parent:'Incremental Plans',label:'Voluntary Life',group:'incr'},
+  ci:{parent:'Incremental Plans',label:'Critical Illness',group:'incr'},
+  rev_tier:{parent:'Reverse Tools',label:'Tier Reverse',group:'rev'},
+  rev_stdltd:{parent:'Reverse Tools',label:'STD/LTD Reverse',group:'rev'},
+  rev_incr:{parent:'Reverse Tools',label:'Vol Life Reverse',group:'rev'},
+};
+const ALLSECS=Object.keys(SECMAP);
+
+function toggleNav(el){el.classList.toggle('open');}
+function openNavGroup(g){
+  document.querySelectorAll(`.snav-parent[data-group="${g}"]`).forEach(e=>e.classList.add('open'));
+}
+function go(key){
+  document.querySelectorAll('.snav-child').forEach(a=>a.classList.remove('active'));
+  const match=document.querySelector(`.snav-child[onclick*="'${key}'"]`);
+  if(match){match.classList.add('active');}
+  const bp=document.getElementById('bc-parent'),bl=document.getElementById('bc-leaf');
+  const bs1=document.getElementById('bc-sep1'),bs2=document.getElementById('bc-sep2');
+  const br=document.getElementById('bc-root');
+  if(key==='all'){
+    br.classList.add('active');bp.textContent='';bl.style.display='none';bs2.style.display='none';bs1.style.display='none';
+    ALLSECS.forEach(k=>document.getElementById('sec-'+k).classList.remove('hidden'));
+    return;
+  }
+  br.classList.remove('active');
+  bs1.style.display='';
+  const m=SECMAP[key]||{parent:'',label:key};
+  bp.textContent=m.parent;
+  bs2.style.display='';
+  bl.style.display='';bl.textContent=m.label;
+  ALLSECS.forEach(k=>{
+    const el=document.getElementById('sec-'+k);
+    k===key?el.classList.remove('hidden'):el.classList.add('hidden');
+  });
+  openNavGroup(m.group||'');
+}
+
+function removeCard(btn){
+  const cont=btn.closest('.sec-body'),card=btn.closest('.ccard');
+  if(cont.querySelectorAll('.ccard').length<=1){toast('At least one calculation required','err');return;}
+  snapshot();card.remove();toast('Calculation removed');
+}
+
+/* ══════════════════════════════════════
+   SAVE MODAL
+══════════════════════════════════════ */
+let _saveCtx=null;
+function openSaveModal(uid,section){
+  _saveCtx={uid,section};
+  const company=document.getElementById('company-name').value||'RateCalc';
+  document.getElementById('modal-fname').value=`${company}_${section}_${new Date().toISOString().slice(0,10)}`;
+  document.getElementById('modal-section').value=section;
+  document.getElementById('save-modal').classList.remove('hidden');
+}
+function closeModal(){document.getElementById('save-modal').classList.add('hidden');_saveCtx=null;}
+function doSave(){
+  if(!_saveCtx)return;
+  saveCardToExcel(_saveCtx.uid,_saveCtx.section,document.getElementById('modal-fname').value||'RateCalc');
+  closeModal();
+}
+
+/* ══════════════════════════════════════
+   FLASH PILL HELPER
+══════════════════════════════════════ */
+function flash(el){
+  if(!el)return;
+  el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');
+}
+
+/* ══════════════════════════════════════
+   TIER CARD
+══════════════════════════════════════ */
+function addTier(cid,planType){
+  snapshot();
+  const n=nid(cid),uid=`tc-${cid}-${n}`;
+  const div=document.createElement('div');div.className='ccard';div.id=uid;
+  div.innerHTML=`
+  <div class="ccard-hdr blue">
+    <div class="ccard-hdr-left"><i class="bi bi-calculator"></i> Calculation #${n} — ${planType}</div>
+    <div class="ccard-hdr-right">
+      <button class="btn-save-card" onclick="openSaveModal('${uid}','${planType}')"><i class="bi bi-file-earmark-excel"></i> Save</button>
+      <button class="btn-remove" onclick="removeCard(this)"><i class="bi bi-x"></i> Remove</button>
+    </div>
+  </div>
+  <div class="ccard-body">
+    <div class="config-panel">
+      <div class="row gap-2">
+        <div class="col-3"><label class="lbl">Plan Name</label><input class="inp" id="${uid}-pname" value="${planType}"/></div>
+        <div class="col-3"><label class="lbl">Pay Cycle</label><select class="inp" id="${uid}-pc" onchange="calcAllTiers('${uid}')">${pcOpts()}</select></div>
+        <div class="col-3"><label class="lbl">Rate Type</label>
+          <div class="rg mt-2">
+            <label><input type="radio" name="${uid}-mode" value="Custom" checked onchange="rebuildTier('${uid}')"> Custom</label>
+            <label><input type="radio" name="${uid}-mode" value="Age-Banded" onchange="rebuildTier('${uid}')"> Age-Banded</label>
+          </div>
+        </div>
+        <div class="col-2"><label class="lbl"># Tiers</label>
+          <select class="inp" id="${uid}-ntiers" onchange="rebuildTier('${uid}')">
+            <option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option>
+          </select>
+        </div>
+        <div class="col-auto d-flex align-items-center pt-3">
+          <label class="chk-lbl"><input type="checkbox" id="${uid}-dp" onchange="rebuildTier('${uid}')"> DP Tiers</label>
+        </div>
+        <div class="col-auto ms-auto d-flex align-items-center pt-3">
+          <button class="btn btn-grn btn-sm" onclick="calcAllTiers('${uid}')"><i class="bi bi-lightning-charge"></i> Calc All</button>
+        </div>
+      </div>
+    </div>
+    <div id="${uid}-shared"></div>
+    <div id="${uid}-table"></div>
+  </div>`;
+  document.getElementById(cid).appendChild(div);
+  rebuildTier(uid);
+}
+
+function getTiers(uid){
+  const n=parseInt(document.getElementById(uid+'-ntiers')?.value)||4;
+  const t=TIERS4.slice(0,n);
+  return document.getElementById(uid+'-dp')?.checked?t.concat(['EE+DP','EE+DP Family']):t;
+}
+function getMode(uid){return document.querySelector(`input[name="${uid}-mode"]:checked`)?.value||'Custom';}
+
+const _childCnt={};
+function getChildCnt(uid){return _childCnt[uid]||0;}
+function bumpChild(uid){_childCnt[uid]=(_childCnt[uid]||0)+1;return _childCnt[uid];}
+
+function rebuildTier(uid){
+  _childCnt[uid]=0;
+  const mode=getMode(uid),tiers=getTiers(uid),isAge=mode==='Age-Banded';
+  const sh=document.getElementById(uid+'-shared');
+
+  if(isAge){
+    sh.innerHTML=`
+    <div class="shared-panel">
+      <div class="shared-panel-hdr"><i class="bi bi-input-cursor-text"></i> Shared Rate Inputs — Auto-fills matching fields in each tier</div>
+      <div class="shared-grid">
+        <div class="srate-grp"><label>EE Rate ($)</label>
+          <input type="number" step="0.01" id="${uid}-sr-ee" placeholder="e.g. 115.76" oninput="applyShared('${uid}')"/></div>
+        <div class="srate-grp"><label>SP Rate ($)</label>
+          <input type="number" step="0.01" id="${uid}-sr-sp" placeholder="e.g. 331.32" oninput="applyShared('${uid}')"/></div>
+        <div class="srate-grp"><label>Per-Child Rate ($)</label>
+          <input type="number" step="0.01" id="${uid}-sr-ch" placeholder="e.g. 198.33" oninput="applyShared('${uid}')"/></div>
+        <div class="srate-grp"><label>DP Rate ($)</label>
+          <input type="number" step="0.01" id="${uid}-sr-dp" placeholder="0.00" oninput="applyShared('${uid}')"/></div>
+      </div>
+      <div class="shared-actions">
+        <button class="btn btn-blu btn-sm" onclick="applySharedCalc('${uid}')">
+          <i class="bi bi-arrow-down-circle"></i> Apply &amp; Calculate All</button>
+        <span class="badge-auto"><i class="bi bi-magic"></i> Auto-fills as you type</span>
+      </div>
+    </div>`;
+  } else { sh.innerHTML=''; }
+
+  const tb=document.getElementById(uid+'-table');
+
+  if(!isAge){
+    let h='<div class="tier-wrap">';
+    h+=`<div class="tier-hdr" style="grid-template-columns:130px 1fr 110px 34px">
+      <span>Tier</span><span>Monthly Rate ($)</span><span>Per-Pay</span><span></span></div>`;
+    tiers.forEach(t=>{
+      const tid=uid+'-'+t.replace(/\W/g,'_');
+      h+=`<div class="tier-row" style="grid-template-columns:130px 1fr 110px 34px">
+        <span class="tier-lbl">${t}</span>
+        <input class="inp" id="${tid}-rate" placeholder="0.00" oninput="calcCustomTier('${uid}','${t}')"/>
+        <span class="pill" id="${tid}-res">—</span>
+        <button class="btn btn-grn btn-sm" onclick="calcCustomTier('${uid}','${t}')">
+          <i class="bi bi-lightning-charge"></i></button>
+      </div>`;
+    });
+    h+='</div>';
+    tb.innerHTML=h;
+    return;
+  }
+
+  let h='<div class="tier-wrap">';
+  tiers.forEach(t=>{
+    const tid=uid+'-'+t.replace(/\W/g,'_');
+    if(t==='EE'){
+      h+=`<div class="tier-hdr" style="grid-template-columns:130px 1fr 110px 105px 34px">
+        <span>Tier</span><span>EE Rate ($)</span><span>Total Monthly</span><span>Per-Pay</span><span></span></div>
+      <div class="tier-row" style="grid-template-columns:130px 1fr 110px 105px 34px">
+        <span class="tier-lbl">EE</span>
+        <input class="inp" id="${tid}-ee" placeholder="0.00" oninput="calcAgeTier('${uid}','EE')"/>
+        <span class="pill blue" id="${tid}-total">—</span>
+        <span class="pill" id="${tid}-res">—</span>
+        <button class="btn btn-grn btn-sm" onclick="calcAgeTier('${uid}','EE')"><i class="bi bi-lightning-charge"></i></button>
+      </div>`;
+    } else if(t==='EE+SP'){
+      h+=`<div class="tier-hdr" style="grid-template-columns:130px 1fr 1fr 110px 105px 34px">
+        <span>Tier</span><span>EE Rate ($)</span><span>SP Rate ($)</span><span>Total Monthly</span><span>Per-Pay</span><span></span></div>
+      <div class="tier-row" style="grid-template-columns:130px 1fr 1fr 110px 105px 34px">
+        <span class="tier-lbl">EE+SP</span>
+        <input class="inp" id="${tid}-ee" placeholder="0.00" oninput="calcAgeTier('${uid}','EE+SP')"/>
+        <input class="inp" id="${tid}-sp" placeholder="0.00" oninput="calcAgeTier('${uid}','EE+SP')"/>
+        <span class="pill blue" id="${tid}-total">—</span>
+        <span class="pill" id="${tid}-res">—</span>
+        <button class="btn btn-grn btn-sm" onclick="calcAgeTier('${uid}','EE+SP')"><i class="bi bi-lightning-charge"></i></button>
+      </div>`;
+    } else if(t==='EE+CH'){
+      h+=`<div class="tier-hdr" style="grid-template-columns:130px 1fr 110px 105px 34px">
+        <span>Tier</span><span>EE Rate ($)</span><span>Total Monthly</span><span>Per-Pay</span><span></span></div>
+      <div class="tier-row" style="grid-template-columns:130px 1fr 110px 105px 34px" id="${tid}-masterrow">
+        <span class="tier-lbl">EE+CH</span>
+        <input class="inp" id="${tid}-ee" placeholder="0.00" oninput="calcEECH('${uid}')"/>
+        <span class="pill blue" id="${tid}-total">—</span>
+        <span class="pill" id="${tid}-res">—</span>
+        <button class="btn btn-grn btn-sm" onclick="calcEECH('${uid}')"><i class="bi bi-lightning-charge"></i></button>
+      </div>
+      <div class="ch-section-hdr" style="grid-template-columns:130px 1fr 110px 105px 34px">
+        <span style="padding-left:.5rem">Child</span><span>Child Rate ($)</span><span>EE+Child Total</span><span>Per-Pay</span><span></span></div>
+      <div id="${tid}-children"></div>
+      <div class="add-child-row" onclick="addChildRow('${uid}')">
+        <span><i class="bi bi-plus-circle"></i> Add Child</span>
+        <span style="font-size:.67rem;color:var(--txt3);margin-left:.3rem">Child 1, Child 2, Child 3…</span>
+      </div>
+      <div class="ch-total-row" style="grid-template-columns:130px 1fr 110px 105px 34px">
+        <span class="ch-total-lbl">EE+CH Grand Total</span>
+        <span style="font-size:.68rem;color:var(--txt3);font-style:italic;align-self:center">EE + all children</span>
+        <span class="pill blue" id="${tid}-ch-grand">—</span>
+        <span class="pill" id="${tid}-ch-pp">—</span><span></span>
+      </div>`;
+    } else if(t==='EE+Family'){
+      h+=`<div class="tier-hdr" style="grid-template-columns:130px 1fr 1fr 110px 105px 34px">
+        <span>Tier</span><span>EE Rate ($)</span><span>SP Rate ($)</span><span>Total Monthly</span><span>Per-Pay</span><span></span></div>
+      <div class="tier-row" style="grid-template-columns:130px 1fr 1fr 110px 105px 34px" id="${tid}-masterrow">
+        <span class="tier-lbl">EE+Family</span>
+        <input class="inp" id="${tid}-ee" placeholder="0.00" oninput="calcEEFamily('${uid}')"/>
+        <input class="inp" id="${tid}-sp" placeholder="0.00" oninput="calcEEFamily('${uid}')"/>
+        <span class="pill blue" id="${tid}-total">—</span>
+        <span class="pill" id="${tid}-res">—</span>
+        <button class="btn btn-grn btn-sm" onclick="calcEEFamily('${uid}')"><i class="bi bi-lightning-charge"></i></button>
+      </div>
+      <div class="ch-section-hdr" style="grid-template-columns:130px 1fr 110px 105px 34px">
+        <span style="padding-left:.5rem">Children (from EE+CH)</span><span>Child Rate ($)</span><span>Subtotal</span><span>Per-Pay</span><span></span></div>
+      <div id="${tid}-children"></div>
+      <div class="ch-total-row" style="grid-template-columns:130px 1fr 110px 105px 34px">
+        <span class="ch-total-lbl">EE+Family Grand Total</span>
+        <span style="font-size:.68rem;color:var(--txt3);font-style:italic;align-self:center">EE+SP+all children</span>
+        <span class="pill blue" id="${tid}-ch-grand">—</span>
+        <span class="pill" id="${tid}-ch-pp">—</span><span></span>
+      </div>`;
+    } else if(t==='EE+DP'){
+      h+=`<div class="tier-hdr" style="grid-template-columns:130px 1fr 1fr 110px 105px 34px">
+        <span>Tier</span><span>EE Rate ($)</span><span>DP Rate ($)</span><span>Total Monthly</span><span>Per-Pay</span><span></span></div>
+      <div class="tier-row" style="grid-template-columns:130px 1fr 1fr 110px 105px 34px">
+        <span class="tier-lbl">EE+DP</span>
+        <input class="inp" id="${tid}-ee" placeholder="0.00" oninput="calcAgeTier('${uid}','EE+DP')"/>
+        <input class="inp" id="${tid}-dp2" placeholder="0.00" oninput="calcAgeTier('${uid}','EE+DP')"/>
+        <span class="pill blue" id="${tid}-total">—</span>
+        <span class="pill" id="${tid}-res">—</span>
+        <button class="btn btn-grn btn-sm" onclick="calcAgeTier('${uid}','EE+DP')"><i class="bi bi-lightning-charge"></i></button>
+      </div>`;
+    } else if(t==='EE+DP Family'){
+      h+=`<div class="tier-hdr" style="grid-template-columns:130px 1fr 1fr 1fr 110px 105px 34px">
+        <span>Tier</span><span>EE Rate ($)</span><span>SP Rate ($)</span><span>DP Rate ($)</span><span>Total Monthly</span><span>Per-Pay</span><span></span></div>
+      <div class="tier-row" style="grid-template-columns:130px 1fr 1fr 1fr 110px 105px 34px">
+        <span class="tier-lbl">EE+DP Family</span>
+        <input class="inp" id="${tid}-ee" placeholder="0.00" oninput="calcAgeTier('${uid}','EE+DP Family')"/>
+        <input class="inp" id="${tid}-sp" placeholder="0.00" oninput="calcAgeTier('${uid}','EE+DP Family')"/>
+        <input class="inp" id="${tid}-dp2" placeholder="0.00" oninput="calcAgeTier('${uid}','EE+DP Family')"/>
+        <span class="pill blue" id="${tid}-total">—</span>
+        <span class="pill" id="${tid}-res">—</span>
+        <button class="btn btn-grn btn-sm" onclick="calcAgeTier('${uid}','EE+DP Family')"><i class="bi bi-lightning-charge"></i></button>
+      </div>`;
+    }
+  });
+  h+='</div>';
+  tb.innerHTML=h;
+  if(tiers.includes('EE+CH')) addChildRow(uid,true);
+  if(tiers.includes('EE+Family')) addFamilyChildRow(uid,true);
+}
+
+function applyShared(uid){
+  const tiers=getTiers(uid),isAge=getMode(uid)==='Age-Banded';
+  const eeV=document.getElementById(uid+'-sr-ee')?.value||'';
+  const spV=document.getElementById(uid+'-sr-sp')?.value||'';
+  const chV=document.getElementById(uid+'-sr-ch')?.value||'';
+  const dpV=document.getElementById(uid+'-sr-dp')?.value||'';
+  tiers.forEach(t=>{
+    const tid=uid+'-'+t.replace(/\W/g,'_');
+    if(eeV!==''){const el=document.getElementById(tid+'-ee');if(el)el.value=eeV;}
+    if(spV!==''&&['EE+SP','EE+Family','EE+DP Family'].includes(t)){const el=document.getElementById(tid+'-sp');if(el)el.value=spV;}
+    if(dpV!==''&&['EE+DP','EE+DP Family'].includes(t)){const el=document.getElementById(tid+'-dp2');if(el)el.value=dpV;}
+    if(chV!==''&&(t==='EE+CH'||t==='EE+Family')){
+      const cont=document.getElementById(tid+'-children');
+      if(cont)cont.querySelectorAll('[id$="-rate"]').forEach(inp=>inp.value=chV);
+    }
+  });
+  if(tiers.includes('EE+CH')) calcEECH(uid);
+  if(tiers.includes('EE+Family')&&isAge) calcEEFamily(uid);
+}
+function applySharedCalc(uid){applyShared(uid);calcAllTiers(uid);}
+
+function calcAgeTier(uid,t){
+  if(t==='EE+CH'){calcEECH(uid);return;}
+  if(t==='EE+Family'){calcEEFamily(uid);return;}
+  const tid=uid+'-'+t.replace(/\W/g,'_');
+  const ee=sf(document.getElementById(tid+'-ee')?.value);
+  const sp=sf(document.getElementById(tid+'-sp')?.value);
+  const dp=sf(document.getElementById(tid+'-dp2')?.value);
+  let total=ee;
+  if(t==='EE+SP')total=ee+sp;
+  else if(t==='EE+DP')total=ee+dp;
+  else if(t==='EE+DP Family')total=ee+sp+dp;
+  const pc=getPCValue(document.getElementById(uid+'-pc')?.value||'Bi-Weekly (26)');
+  const pp=perPay(total,pc);
+  const te=document.getElementById(tid+'-total'),re=document.getElementById(tid+'-res');
+  if(te){te.textContent=fmt(total,2);flash(te);}
+  if(re){re.textContent=fmt(pp);flash(re);}
+}
+
+function calcEECH(uid){
+  const tid=uid+'-EE_CH';
+  const pc=getPCValue(document.getElementById(uid+'-pc')?.value||'Bi-Weekly (26)');
+  const ee=sf(document.getElementById(tid+'-ee')?.value);
+  const cont=document.getElementById(tid+'-children');
+  if(!cont)return;
+  let chSum=0;
+  cont.querySelectorAll('[id$="-rate"]').forEach(inp=>{
+    const cr=sf(inp.value);chSum+=cr;
+    const chid=inp.id.replace('-rate','');
+    const subTotal=ee+cr;
+    const subEl=document.getElementById(chid+'-sub');
+    const ppEl=document.getElementById(chid+'-pp');
+    if(subEl){subEl.textContent=fmt(subTotal,2);flash(subEl);}
+    if(ppEl){ppEl.textContent=fmt(perPay(subTotal,pc));flash(ppEl);}
+  });
+  const grand=ee+chSum,grandPP=perPay(grand,pc);
+  const grandEl=document.getElementById(tid+'-ch-grand');if(grandEl){grandEl.textContent=fmt(grand,2);flash(grandEl);}
+  const ppEl=document.getElementById(tid+'-ch-pp');if(ppEl){ppEl.textContent=fmt(grandPP);flash(ppEl);}
+  const totEl=document.getElementById(tid+'-total');if(totEl){totEl.textContent=fmt(grand,2);flash(totEl);}
+  const resEl=document.getElementById(tid+'-res');if(resEl){resEl.textContent=fmt(grandPP);flash(resEl);}
+  const famTid=uid+'-EE_Family';
+  if(document.getElementById(famTid+'-children')!==null) calcEEFamily(uid);
+}
+
+function calcEEFamily(uid){
+  const famTid=uid+'-EE_Family',eechTid=uid+'-EE_CH';
+  const pc=getPCValue(document.getElementById(uid+'-pc')?.value||'Bi-Weekly (26)');
+  const ee=sf(document.getElementById(famTid+'-ee')?.value);
+  const sp=sf(document.getElementById(famTid+'-sp')?.value);
+  const eechCont=document.getElementById(eechTid+'-children');
+  let chSum=0;
+  const famChildCont=document.getElementById(famTid+'-children');
+  if(eechCont){
+    if(famChildCont) famChildCont.innerHTML='';
+    let rowIdx=0;
+    eechCont.querySelectorAll('[id$="-rate"]').forEach(inp=>{
+      rowIdx++;
+      const cr=sf(inp.value);chSum+=cr;
+      const label=inp.closest('.ch-subrow')?.querySelector('.ch-lbl')?.textContent?.trim()||('Child '+rowIdx);
+      const subTotal=ee+sp+cr;
+      if(famChildCont){
+        const row=document.createElement('div');
+        row.className='ch-subrow';
+        row.style.gridTemplateColumns='130px 1fr 110px 105px 34px';
+        row.innerHTML=`<span class="ch-lbl"><i class="bi bi-person-fill"></i>${label}</span>
+          <span class="pill blue" style="justify-self:start;font-size:.72rem">${fmt(cr,2)}</span>
+          <span class="pill blue">${fmt(subTotal,2)}</span>
+          <span class="pill">${fmt(perPay(subTotal,pc))}</span><span></span>`;
+        famChildCont.appendChild(row);
+      }
+    });
+  }
+  const grand=ee+sp+chSum,grandPP=perPay(grand,pc);
+  const grandEl=document.getElementById(famTid+'-ch-grand');if(grandEl){grandEl.textContent=fmt(grand,2);flash(grandEl);}
+  const ppEl=document.getElementById(famTid+'-ch-pp');if(ppEl){ppEl.textContent=fmt(grandPP);flash(ppEl);}
+  const totEl=document.getElementById(famTid+'-total');if(totEl){totEl.textContent=fmt(grand,2);flash(totEl);}
+  const resEl=document.getElementById(famTid+'-res');if(resEl){resEl.textContent=fmt(grandPP);flash(resEl);}
+}
+
+function addChildRow(uid,silent){
+  const c=bumpChild(uid),tid=uid+'-EE_CH',chid=`${uid}-child-${c}`;
+  const cont=document.getElementById(tid+'-children');
+  if(!cont)return;
+  const div=document.createElement('div');div.className='ch-subrow';div.id=chid+'-row';
+  div.style.gridTemplateColumns='130px 1fr 110px 105px 34px';
+  div.innerHTML=`<span class="ch-lbl"><i class="bi bi-person-fill"></i> Child ${c}</span>
+    <input class="inp" id="${chid}-rate" placeholder="0.00" oninput="calcEECH('${uid}')"/>
+    <span class="pill blue" id="${chid}-sub">—</span>
+    <span class="pill" id="${chid}-pp">—</span>
+    <button class="btn btn-sm" style="background:var(--red-lt);color:var(--red);border:1px solid #FCA5A5"
+      onclick="removeChild('${uid}','${chid}',true)"><i class="bi bi-x"></i></button>`;
+  cont.appendChild(div);
+  if(!silent)calcEECH(uid);
+}
+
+function addFamilyChildRow(uid,silent){if(!silent) calcEEFamily(uid);}
+function removeChild(uid,chid,isAge){
+  const row=document.getElementById(chid+'-row');if(row)row.remove();
+  if(isAge){calcEECH(uid);calcEEFamily(uid);}
+}
+
+function calcCustomTier(uid,t){
+  const tid=uid+'-'+t.replace(/\W/g,'_');
+  const m=sf(document.getElementById(tid+'-rate')?.value);
+  const pp=perPay(m,getPCValue(document.getElementById(uid+'-pc')?.value||'Bi-Weekly (26)'));
+  const el=document.getElementById(tid+'-res');if(el){el.textContent=fmt(pp);flash(el);}
+}
+function calcAllTiers(uid){
+  const mode=getMode(uid);
+  getTiers(uid).forEach(t=>mode==='Custom'?calcCustomTier(uid,t):calcAgeTier(uid,t));
+}
+
+/* ══════════════════════════════════════
+   STD / LTD  —  with Rate-Base Toggle
+══════════════════════════════════════ */
+
+/* ══════════════════════════════════════
+   STD / LTD — ROUNDING RULES
+══════════════════════════════════════ */
+const ROUND_RULES={
+  'none':         {label:'No Rounding',           fn:v=>v},
+  'next10':       {label:'Next Highest $10',       fn:v=>Math.ceil(v/10)*10},
+  'nearest10':    {label:'Nearest $10',            fn:v=>Math.round(v/10)*10},
+  'rounddown10':  {label:'Round Down to $10',      fn:v=>Math.floor(v/10)*10},
+  'nextwhole':    {label:'Round Up to Next Whole Dollar',   fn:v=>Math.ceil(v)},
+  'downwhole':    {label:'Round Down to Lower Whole Dollar',fn:v=>Math.floor(v)},
+  'conventional': {label:'Conventional Rounding to Whole Dollar', fn:v=>Math.round(v)},
+};
+
+function roundingOpts(sel){
+  sel=sel||'none';
+  return `<option value="none"${sel==='none'?' selected':''}>Please select / No Rounding</option>`+
+    Object.entries(ROUND_RULES).filter(([k])=>k!=='none').map(([k,r])=>
+      `<option value="${k}"${sel===k?' selected':''}>${r.label}</option>`
+    ).join('');
+}
+
+function applyRounding(value, uid){
+  const sel=document.getElementById(uid+'-round')?.value||'none';
+  const rule=ROUND_RULES[sel]||ROUND_RULES['none'];
+  return rule.fn(value);
+}
+
+/* ══════════════════════════════════════
+   STD / LTD — SALARY TAB SWITCHER
+══════════════════════════════════════ */
+function switchSalTab(uid, tab){
+  ['annual','hourly'].forEach(t=>{
+    document.getElementById(`${uid}-tab-${t}`)?.classList.toggle('active', t===tab);
+    document.getElementById(`${uid}-panel-${t}`)?.classList.toggle('active', t===tab);
+  });
+  // sync annual salary from hourly if switching to annual
+  if(tab==='annual') syncHourlyToAnnual(uid);
+}
+
+function syncHourlyToAnnual(uid){
+  const hr=sf(document.getElementById(uid+'-hr-rate')?.value);
+  const hw=sf(document.getElementById(uid+'-hr-hours')?.value)||40;
+  const wk=sf(document.getElementById(uid+'-hr-weeks')?.value)||52;
+  if(hr>0){
+    const annual=hr*hw*wk;
+    const annEl=document.getElementById(uid+'-sal');
+    if(annEl) annEl.value=annual.toFixed(2);
+    // show badge
+    const badge=document.getElementById(uid+'-annual-badge');
+    if(badge){badge.textContent=`$${hr.toFixed(2)}/hr × ${hw}h × ${wk}wk = $${annual.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;badge.style.display='inline-flex';}
+  }
+}
+
+function onHourlyInput(uid){
+  syncHourlyToAnnual(uid);
+}
+
+/* ══════════════════════════════════════
+   STD / LTD — CORE LOGIC
+══════════════════════════════════════ */
+function getRateBase(uid){
+  return document.querySelector(`input[name="${uid}-rbase"]:checked`)?.value||'benefit';
+}
+
+function updateSTDLTDNote(uid, isS){
+  const rb=getRateBase(uid);
+  const fnEl=document.getElementById(uid+'-fnote');
+  const divisor=isS?'÷ 10':'÷ 100';
+  if(rb==='benefit'){
+    fnEl.innerHTML=`<i class="bi bi-info-circle"></i>
+      ${isS
+        ? `STD: Period = Salary ÷ 52 &nbsp;|&nbsp; Benefit = Min(Weekly × %, Max) &nbsp;|&nbsp; <b>Premium = Rate × Benefit ${divisor}</b>`
+        : `LTD: Period = Salary ÷ 12 &nbsp;|&nbsp; Benefit = Min(Monthly × %, Max) &nbsp;|&nbsp; <b>Premium = Rate × Benefit ${divisor}</b>`
+      }`;
+  } else {
+    fnEl.innerHTML=`<i class="bi bi-info-circle"></i>
+      ${isS
+        ? `STD (Salary-Based): Period = Salary ÷ 52 &nbsp;|&nbsp; <b>Premium = Rate × Period Salary ${divisor}</b> &nbsp;|&nbsp; Benefit cap ignored`
+        : `LTD (Salary-Based): Period = Salary ÷ 12 &nbsp;|&nbsp; <b>Premium = Rate × Period Salary ${divisor}</b> &nbsp;|&nbsp; Benefit cap ignored`
+      }`;
+  }
+  ['benefit','salary'].forEach(v=>{
+    const lbl=document.getElementById(`${uid}-rb-lbl-${v}`);
+    if(lbl) lbl.classList.toggle('rb-active', v===rb);
+  });
+  const benefitOnly=document.getElementById(uid+'-benefit-fields');
+  if(benefitOnly) benefitOnly.style.opacity=rb==='salary'?'.4':'1';
+}
+
+function addSTDLTD(cid,type){
+  snapshot();
+  const n=nid(cid),uid=`sl-${cid}-${n}`;
+  const isS=type==='STD';
+  const div=document.createElement('div');div.className='ccard';div.id=uid;
+  div.innerHTML=`
+  <div class="ccard-hdr amber">
+    <div class="ccard-hdr-left"><i class="bi bi-clipboard2-pulse"></i> ${type} Calculation #${n}</div>
+    <div class="ccard-hdr-right">
+      <button class="btn-save-card" onclick="openSaveModal('${uid}','${type}')"><i class="bi bi-file-earmark-excel"></i> Save</button>
+      <button class="btn-remove" onclick="removeCard(this)"><i class="bi bi-x"></i> Remove</button>
+    </div>
+  </div>
+  <div class="ccard-body">
+    <div class="fnote amber" id="${uid}-fnote"></div>
+    <div class="config-panel">
+
+      <!-- ── Row 1: Plan Name | Pay Cycle | Rate-Base Toggle ── -->
+      <div class="row gap-2 mb-2">
+        <div class="col-3"><label class="lbl">Plan Name</label><input class="inp" id="${uid}-pname" value="${type}"/></div>
+        <div class="col-4"><label class="lbl">Pay Cycle</label><select class="inp" id="${uid}-pc">${pcOpts()}</select></div>
+        <div class="col-auto d-flex align-items-center pt-3" style="gap:.5rem">
+          <label class="lbl" style="margin-bottom:0">Apply Rate to</label>
+          <div class="rate-base-toggle">
+            <label id="${uid}-rb-lbl-benefit" class="rb-active">
+              <input type="radio" name="${uid}-rbase" value="benefit" checked onchange="updateSTDLTDNote('${uid}',${isS})">
+              <span><i class="bi bi-shield-check"></i> Benefit</span>
+            </label>
+            <label id="${uid}-rb-lbl-salary">
+              <input type="radio" name="${uid}-rbase" value="salary" onchange="updateSTDLTDNote('${uid}',${isS})">
+              <span><i class="bi bi-cash-stack"></i> Salary</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Salary Tab Switcher ── -->
+      <div class="sal-tabs">
+        <button class="sal-tab active" id="${uid}-tab-annual" onclick="switchSalTab('${uid}','annual')">
+          <i class="bi bi-briefcase"></i> Annual Salary
+        </button>
+        <button class="sal-tab" id="${uid}-tab-hourly" onclick="switchSalTab('${uid}','hourly')">
+          <i class="bi bi-clock"></i> Hourly Salary
+        </button>
+      </div>
+
+      <!-- ── Annual Panel ── -->
+      <div class="sal-panel active" id="${uid}-panel-annual">
+        <div class="row gap-2">
+          <div class="col-3">
+            <label class="lbl">Annual Salary ($)</label>
+            <input class="inp" id="${uid}-sal" placeholder="65000"/>
+            <div class="hourly-badge mt-2" id="${uid}-annual-badge" style="display:none"></div>
+          </div>
+          <div id="${uid}-benefit-fields" style="display:contents;transition:opacity .2s">
+            <div class="col-3"><label class="lbl">${isS?'% of Weekly Salary':'% of Monthly Salary'}</label><input class="inp" id="${uid}-pct" placeholder="60"/></div>
+            <div class="col-3"><label class="lbl">${isS?'Max Weekly Benefit ($)':'Max Monthly Benefit ($)'}</label><input class="inp" id="${uid}-maxb" placeholder="${isS?'1500':'5000'}"/></div>
+          </div>
+          <div class="col-3"><label class="lbl">Rate</label><input class="inp" id="${uid}-rate" placeholder="${isS?'0.0031':'0.0025'}"/></div>
+        </div>
+      </div>
+
+      <!-- ── Hourly Panel ── -->
+      <div class="sal-panel" id="${uid}-panel-hourly">
+        <div class="row gap-2 mb-2">
+          <div class="col-3">
+            <label class="lbl">Hourly Rate ($)</label>
+            <input class="inp" id="${uid}-hr-rate" placeholder="e.g. 50.00" oninput="onHourlyInput('${uid}')"/>
+          </div>
+          <div class="col-2">
+            <label class="lbl">Hours / Week</label>
+            <input class="inp" id="${uid}-hr-hours" placeholder="40" value="40" oninput="onHourlyInput('${uid}')"/>
+          </div>
+          <div class="col-2">
+            <label class="lbl">Weeks / Year</label>
+            <input class="inp" id="${uid}-hr-weeks" placeholder="52" value="52" oninput="onHourlyInput('${uid}')"/>
+          </div>
+          <div class="col-auto d-flex align-items-end pb-1">
+            <div style="font-size:.72rem;color:var(--txt2)">
+              <i class="bi bi-arrow-right" style="color:var(--amb)"></i>
+              Annual = <span id="${uid}-hr-annual-disp" style="font-family:var(--mono);font-weight:700;color:var(--amb)">—</span>
+            </div>
+          </div>
+        </div>
+        <div class="row gap-2">
+          <div id="${uid}-benefit-fields-h" style="display:contents;transition:opacity .2s">
+            <div class="col-3"><label class="lbl">${isS?'% of Weekly Salary':'% of Monthly Salary'}</label><input class="inp" id="${uid}-pct-h" placeholder="60"/></div>
+            <div class="col-3"><label class="lbl">${isS?'Max Weekly Benefit ($)':'Max Monthly Benefit ($)'}</label><input class="inp" id="${uid}-maxb-h" placeholder="${isS?'1500':'5000'}"/></div>
+          </div>
+          <div class="col-3"><label class="lbl">Rate</label><input class="inp" id="${uid}-rate-h" placeholder="${isS?'0.0031':'0.0025'}"/></div>
+        </div>
+      </div>
+
+      <!-- ── Rounding Rule ── -->
+      <div class="rounding-row">
+        <label class="lbl"><i class="bi bi-sliders" style="font-size:.8rem"></i> Premium Rounding</label>
+        <select class="inp" id="${uid}-round" onchange="updateRoundBadge('${uid}')">${roundingOpts()}</select>
+        <span class="rounding-badge" id="${uid}-round-badge" style="display:none"></span>
+      </div>
+
+      <div class="row gap-2 mt-2 justify-content-end">
+        <div class="col-auto"><button class="btn btn-amb" onclick="calcSTDLTD('${uid}','${type}')"><i class="bi bi-lightning-charge"></i> Calculate</button></div>
+      </div>
+    </div>
+
+    <!-- ── Results ── -->
+    <div class="res-row amber" id="${uid}-res" style="display:none">
+      <div class="res-cell"><div class="res-lbl amber" id="${uid}-lbl-src">Salary Source</div><div class="res-val" id="${uid}-rsrc">—</div></div>
+      <div class="res-cell"><div class="res-lbl amber" id="${uid}-lbl-p">Period Salary</div><div class="res-val" id="${uid}-rp">—</div></div>
+      <div class="res-cell" id="${uid}-cell-pct"><div class="res-lbl amber">% Amount</div><div class="res-val" id="${uid}-ra">—</div></div>
+      <div class="res-cell" id="${uid}-cell-ben"><div class="res-lbl amber">Benefit Used</div><div class="res-val" id="${uid}-rb2">—</div></div>
+      <div class="res-cell"><div class="res-lbl amber">Monthly Premium</div><div class="res-val" id="${uid}-rprem">—</div></div>
+      <div class="res-cell"><div class="res-lbl amber">Per-Pay <span id="${uid}-rnd-lbl" style="font-size:.55rem;opacity:.7"></span></div><div class="res-val big" id="${uid}-rpp">—</div></div>
+    </div>
+  </div>`;
+  document.getElementById(cid).appendChild(div);
+  updateSTDLTDNote(uid,isS);
+}
+
+function updateRoundBadge(uid){
+  const sel=document.getElementById(uid+'-round')?.value||'none';
+  const badge=document.getElementById(uid+'-round-badge');
+  if(!badge) return;
+  if(sel==='none'){badge.style.display='none';}
+  else{badge.textContent=ROUND_RULES[sel]?.label||'';badge.style.display='inline-flex';}
+}
+
+function calcSTDLTD(uid,type){
+  const isS=type==='STD';
+  const rb=getRateBase(uid);
+  const pc=getPCValue(document.getElementById(uid+'-pc')?.value||'Bi-Weekly (26)');
+  const periodDiv=isS?52:12;
+  const divisor=isS?10:100;
+
+  // ── Determine salary source (annual or hourly tab) ──
+  const activeTab=document.getElementById(uid+'-tab-hourly')?.classList.contains('active')?'hourly':'annual';
+  let sal=0, salSourceLabel='';
+
+  if(activeTab==='hourly'){
+    const hr=sf(document.getElementById(uid+'-hr-rate')?.value);
+    const hw=sf(document.getElementById(uid+'-hr-hours')?.value)||40;
+    const wk=sf(document.getElementById(uid+'-hr-weeks')?.value)||52;
+    if(!hr){toast('Enter Hourly Rate','err');return;}
+    sal=hr*hw*wk;
+    salSourceLabel=`$${hr.toFixed(2)}/hr × ${hw}h × ${wk}wk`;
+    // update live display
+    const dispEl=document.getElementById(uid+'-hr-annual-disp');
+    if(dispEl) dispEl.textContent='$'+sal.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    // sync to annual field for reference
+    const annEl=document.getElementById(uid+'-sal');if(annEl) annEl.value=sal.toFixed(2);
+    const badge=document.getElementById(uid+'-annual-badge');
+    if(badge){badge.textContent=`${salSourceLabel} = $${sal.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;badge.style.display='inline-flex';}
+  } else {
+    sal=sf(document.getElementById(uid+'-sal')?.value);
+    if(!sal){toast('Enter Annual Salary','err');return;}
+    salSourceLabel='Annual';
+  }
+
+  // ── Get rate / pct / maxb from active tab's fields ──
+  const rateFld = activeTab==='hourly'? uid+'-rate-h' : uid+'-rate';
+  const pctFld  = activeTab==='hourly'? uid+'-pct-h'  : uid+'-pct';
+  const maxbFld = activeTab==='hourly'? uid+'-maxb-h' : uid+'-maxb';
+
+  const rate=sf(document.getElementById(rateFld)?.value);
+  const period=sal/periodDiv;
+  let premium, pctAmt=0, benefit=0, capped=false;
+
+  if(rb==='salary'){
+    premium=rate*period/divisor;
+    document.getElementById(uid+'-cell-pct').style.display='none';
+    document.getElementById(uid+'-cell-ben').style.display='none';
+  } else {
+    const pct=sf(document.getElementById(pctFld)?.value);
+    const maxb=sf(document.getElementById(maxbFld)?.value);
+    pctAmt=period*(pct/100);
+    benefit=maxb>0?Math.min(pctAmt,maxb):pctAmt;
+    capped=maxb>0&&pctAmt>maxb;
+    premium=rate*benefit/divisor;
+    document.getElementById(uid+'-cell-pct').style.display='';
+    document.getElementById(uid+'-cell-ben').style.display='';
+  }
+
+  // ── Apply rounding to Per-Pay ──
+  const ppRaw=perPay(premium,pc);
+  const ppRounded=applyRounding(ppRaw,uid);
+  const roundSel=document.getElementById(uid+'-round')?.value||'none';
+  const roundApplied=roundSel!=='none';
+
+  // ── Update result row ──
+  document.getElementById(uid+'-rsrc').textContent=salSourceLabel+(activeTab==='hourly'?` = $${sal.toLocaleString('en-US',{minimumFractionDigits:2})}` :'');
+  document.getElementById(uid+'-rp').textContent=fmt(period,2)+(isS?'/wk':'/mo');
+  if(rb==='benefit'){
+    document.getElementById(uid+'-ra').innerHTML=fmt(pctAmt,2)+(capped?'<span class="badge-cap">capped</span>':'');
+    document.getElementById(uid+'-rb2').textContent=fmt(benefit,2);
+  }
+  document.getElementById(uid+'-rprem').textContent=fmt(premium);
+
+  const pp_el=document.getElementById(uid+'-rpp');
+  pp_el.textContent=roundApplied?'$'+ppRounded.toFixed(2):fmt(ppRaw);
+  flash(pp_el);
+
+  const rndLbl=document.getElementById(uid+'-rnd-lbl');
+  if(rndLbl) rndLbl.textContent=roundApplied?`(${ROUND_RULES[roundSel]?.label})`:'';
+  if(roundApplied && Math.abs(ppRounded-ppRaw)>0.001){
+    pp_el.title=`Raw: ${fmt(ppRaw)}  →  Rounded: $${ppRounded.toFixed(2)}`;
+  }
+
+  document.getElementById(uid+'-res').style.display='flex';
+  updateRoundBadge(uid);
+  snapshot();toast('Calculation complete');
+}
+
+/* ══════════════════════════════════════
+   VOL LIFE / CI
+══════════════════════════════════════ */
+function addVolLife(cid,planLabel){
+  snapshot();
+  const n=nid(cid),uid=`vl-${cid}-${n}`;
+  const div=document.createElement('div');div.className='ccard';div.id=uid;
+  div.innerHTML=`
+  <div class="ccard-hdr purple">
+    <div class="ccard-hdr-left"><i class="bi bi-briefcase"></i> ${planLabel} #${n}</div>
+    <div class="ccard-hdr-right">
+      <button class="btn-save-card" onclick="openSaveModal('${uid}','${planLabel}')"><i class="bi bi-file-earmark-excel"></i> Save</button>
+      <button class="btn-remove" onclick="removeCard(this)"><i class="bi bi-x"></i> Remove</button>
+    </div>
+  </div>
+  <div class="ccard-body">
+    <div class="fnote purple"><i class="bi bi-info-circle"></i>
+      Premium = Rate × Election ÷ 1,000 &nbsp;|&nbsp; Per-Pay = (Premium × 12) ÷ Pay Cycle
+    </div>
+    <div class="config-panel">
+      <div class="row gap-2">
+        <div class="col-4"><label class="lbl">Plan Name</label><input class="inp" id="${uid}-pname" value="${planLabel}"/></div>
+        <div class="col-4"><label class="lbl">Pay Cycle</label><select class="inp" id="${uid}-pc" onchange="calcAllMembers('${uid}')">${pcOpts()}</select></div>
+        <div class="col-auto ms-auto d-flex align-items-center pt-3 gap-2">
+          <button class="btn btn-pur btn-sm" onclick="calcAllMembers('${uid}')"><i class="bi bi-lightning-charge"></i> Calc All</button>
+          <button class="btn-out btn-sm btn" onclick="addMemberRow('${uid}')"><i class="bi bi-plus-lg"></i> Add Member</button>
+        </div>
+      </div>
+    </div>
+    <div class="tier-wrap">
+      <div class="tier-hdr" style="grid-template-columns:90px 70px 120px 130px 110px 110px 34px">
+        <span>Member</span><span>Age</span><span>Rate/1,000</span><span>Election ($)</span><span>Premium ($)</span><span>Per-Pay ($)</span><span></span>
+      </div>
+      <div class="scroll-wrap" id="${uid}-members"></div>
+    </div>
+  </div>`;
+  document.getElementById(cid).appendChild(div);
+  ['EE','SP','CH'].forEach(m=>addMemberRow(uid,m));
+}
+function addMemberRow(uid,def){
+  def=def||'';const id=`${uid}-m${nid(uid+'-m')}`;
+  const opts=['EE','SP','CH','DP','Other'].map(m=>`<option${m===def?' selected':''}>${m}</option>`).join('');
+  const div=document.createElement('div');div.className='tier-row';
+  div.style.gridTemplateColumns='90px 70px 120px 130px 110px 110px 34px';
+  div.innerHTML=`
+    <select class="inp">${opts}</select>
+    <input class="inp" id="${id}-age" placeholder="Age"/>
+    <input class="inp" id="${id}-rate" placeholder="0.148" oninput="calcMember('${uid}','${id}')"/>
+    <input class="inp" id="${id}-elec" placeholder="100000" oninput="calcMember('${uid}','${id}')"/>
+    <span class="pill" id="${id}-prem">—</span>
+    <span class="pill" id="${id}-pp">—</span>
+    <button class="btn btn-pur btn-sm" onclick="calcMember('${uid}','${id}')"><i class="bi bi-lightning-charge"></i></button>`;
+  document.getElementById(uid+'-members').appendChild(div);
+}
+function calcMember(uid,id){
+  const r=sf(document.getElementById(id+'-rate')?.value);
+  const el=sf(document.getElementById(id+'-elec')?.value);
+  const pc=getPCValue(document.getElementById(uid+'-pc')?.value||'Bi-Weekly (26)');
+  const prem=r*el/1000;
+  const pp=perPay(prem,pc);
+  const pe=document.getElementById(id+'-prem'),ppe=document.getElementById(id+'-pp');
+  if(pe){pe.textContent=fmt(prem);flash(pe);}
+  if(ppe){ppe.textContent=fmt(pp);flash(ppe);}
+}
+function calcAllMembers(uid){
+  document.getElementById(uid+'-members')?.querySelectorAll('.tier-row').forEach(row=>{
+    const rateEl=row.querySelector('[id$="-rate"]');
+    if(!rateEl)return;
+    calcMember(uid,rateEl.id.replace('-rate',''));
+  });
+}
+
+/* ══════════════════════════════════════
+   REVERSE TIER
+══════════════════════════════════════ */
+function addRevTier(){
+  snapshot();
+  const n=nid('rt'),uid=`rt-${n}`;
+  const div=document.createElement('div');div.className='ccard';div.id=uid;
+  div.innerHTML=`
+  <div class="ccard-hdr teal">
+    <div class="ccard-hdr-left"><i class="bi bi-arrow-left-right"></i> Tier Reverse #${n} — Per-Pay → Monthly Rate</div>
+    <div class="ccard-hdr-right">
+      <button class="btn-save-card" onclick="openSaveModal('${uid}','Tier Reverse')"><i class="bi bi-file-earmark-excel"></i> Save</button>
+      <button class="btn-remove" onclick="removeCard(this)"><i class="bi bi-x"></i> Remove</button>
+    </div>
+  </div>
+  <div class="ccard-body">
+    <div class="fnote teal"><i class="bi bi-arrow-repeat"></i> Monthly Rate = Per-Pay × Pay Cycles ÷ 12</div>
+    <div class="config-panel">
+      <div class="row gap-2">
+        <div class="col-4"><label class="lbl">Plan Name</label><input class="inp" id="${uid}-pname" placeholder="Medical / Dental..."/></div>
+        <div class="col-4"><label class="lbl">Pay Cycle</label><select class="inp" id="${uid}-pc">${pcOpts()}</select></div>
+        <div class="col-auto ms-auto d-flex align-items-center pt-3">
+          <button class="btn btn-tel btn-sm" onclick="addRevTierRow('${uid}')"><i class="bi bi-plus-lg"></i> Add Tier Row</button>
+        </div>
+      </div>
+    </div>
+    <div class="tier-wrap">
+      <div class="tier-hdr" style="grid-template-columns:130px 1fr 1fr 1fr 34px">
+        <span>Tier Label</span><span>Per-Pay ($)</span><span>Monthly Rate</span><span>Annual Total</span><span></span>
+      </div>
+      <div id="${uid}-rows"></div>
+    </div>
+  </div>`;
+  document.getElementById('rev-tier-cards').appendChild(div);
+  ['EE','EE+SP','EE+CH','EE+Family'].forEach(t=>addRevTierRow(uid,t));
+}
+function addRevTierRow(uid,lbl){
+  lbl=lbl||'';const id=`${uid}-r${nid(uid+'-rt')}`;
+  const div=document.createElement('div');div.className='tier-row';
+  div.style.gridTemplateColumns='130px 1fr 1fr 1fr 34px';
+  div.innerHTML=`
+    <input class="inp" value="${lbl}" placeholder="Tier"/>
+    <input class="inp" id="${id}-pp" placeholder="0.0000" oninput="calcRevTierRow('${uid}','${id}')"/>
+    <span class="pill teal" id="${id}-mo">—</span>
+    <span class="pill teal" id="${id}-yr">—</span>
+    <button class="btn btn-tel btn-sm" onclick="calcRevTierRow('${uid}','${id}')"><i class="bi bi-lightning-charge"></i></button>`;
+  document.getElementById(uid+'-rows').appendChild(div);
+}
+function calcRevTierRow(uid,id){
+  const pp=sf(document.getElementById(id+'-pp')?.value);
+  const pc=getPCValue(document.getElementById(uid+'-pc')?.value||'Bi-Weekly (26)');
+  const mo=moFromPP(pp,pc),yr=mo*12;
+  const me=document.getElementById(id+'-mo'),ye=document.getElementById(id+'-yr');
+  if(me){me.textContent=fmt(mo)+'/mo';flash(me);}
+  if(ye){ye.textContent='$'+yr.toFixed(2)+'/yr';flash(ye);}
+}
+
+/* ══════════════════════════════════════
+   REVERSE STD/LTD — SMART WIZARD
+   with Rate-Base toggle
+══════════════════════════════════════ */
+function addRevSTDLTD(){
+  snapshot();
+  const n=nid('rsl'),uid=`rsl-${n}`;
+  const div=document.createElement('div');div.className='ccard';div.id=uid;
+  div.innerHTML=`
+  <div class="ccard-hdr teal">
+    <div class="ccard-hdr-left"><i class="bi bi-arrow-left-right"></i> STD/LTD Reverse #${n} — Smart Solver</div>
+    <div class="ccard-hdr-right">
+      <button class="btn-save-card" onclick="openSaveModal('${uid}','STD-LTD Reverse')"><i class="bi bi-file-earmark-excel"></i> Save</button>
+      <button class="btn-remove" onclick="removeCard(this)"><i class="bi bi-x"></i> Remove</button>
+    </div>
+  </div>
+  <div class="ccard-body">
+    <div class="fnote teal" id="${uid}-rev-fnote"><i class="bi bi-lightbulb"></i> Tell the wizard what values you have — it will ask only for what's needed, then solve for the unknown.</div>
+    <div class="wizard-panel">
+      <div class="wizard-step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Plan Type, Pay Cycle &amp; Rate Base</div>
+          <div class="row gap-2">
+            <div class="col-3">
+              <div class="rg">
+                <label><input type="radio" name="${uid}-type" value="STD" checked onchange="wizSTDLTDReset('${uid}')"> <b>STD</b></label>
+                <label><input type="radio" name="${uid}-type" value="LTD" onchange="wizSTDLTDReset('${uid}')"> <b>LTD</b></label>
+              </div>
+            </div>
+            <div class="col-4"><select class="inp" id="${uid}-pc">${pcOpts()}</select></div>
+            <div class="col-auto d-flex align-items-center" style="gap:.5rem">
+              <span style="font-size:.7rem;font-weight:700;color:var(--txt2)">Rate applies to</span>
+              <div class="rate-base-toggle">
+                <label id="${uid}-rb-lbl-benefit" class="rb-active">
+                  <input type="radio" name="${uid}-rbase" value="benefit" checked onchange="wizSTDLTDReset('${uid}')">
+                  <span><i class="bi bi-shield-check"></i> Benefit</span>
+                </label>
+                <label id="${uid}-rb-lbl-salary">
+                  <input type="radio" name="${uid}-rbase" value="salary" onchange="wizSTDLTDReset('${uid}')">
+                  <span><i class="bi bi-cash-stack"></i> Salary</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="wizard-step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">What values do you already have?</div>
+          <div class="step-desc">Select all that apply — the solver will determine what to calculate.</div>
+          <div class="known-selector" id="${uid}-known-sel"></div>
+        </div>
+      </div>
+      <div class="wizard-step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Enter Known Values</div>
+          <div class="calc-area show" id="${uid}-inputs">
+            <div class="row gap-2" id="${uid}-input-fields"></div>
+            <div class="mt-2" id="${uid}-solve-info" style="font-size:.72rem;color:var(--txt3);font-style:italic"></div>
+            <div class="mt-2">
+              <button class="btn btn-tel" onclick="calcRevSTDLTD('${uid}')"><i class="bi bi-lightning-charge"></i> Solve</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="res-row teal" id="${uid}-res" style="display:none">
+      <div class="res-cell"><div class="res-lbl teal">Solve Target</div><div class="res-val" id="${uid}-rtarget">—</div></div>
+      <div class="res-cell"><div class="res-lbl teal">Working</div><div class="res-val" id="${uid}-rw">—</div></div>
+      <div class="res-cell"><div class="res-lbl teal">Result</div><div class="res-val big" id="${uid}-rr">—</div></div>
+      <div class="res-cell"><div class="res-lbl teal">Verification</div><div class="res-val" id="${uid}-rv">—</div></div>
+    </div>
+  </div>`;
+  document.getElementById('rev-stdltd-cards').appendChild(div);
+  wizSTDLTDReset(uid);
+}
+
+/* Fields available per mode */
+const REVSTD_FIELDS_BENEFIT={
+  pp:{label:'Known Per-Pay ($)',ph:'12.34'},
+  sal:{label:'Annual Salary ($)',ph:'65000'},
+  pct:{label:'Benefit %',ph:'60'},
+  maxb:{label:'Max Benefit ($)',ph:'1500'},
+  rate:{label:'Rate',ph:'0.0031'},
+};
+const REVSTD_FIELDS_SALARY={
+  pp:{label:'Known Per-Pay ($)',ph:'12.34'},
+  sal:{label:'Annual Salary ($)',ph:'65000'},
+  rate:{label:'Rate',ph:'0.0031'},
+};
+
+function getRevRateBase(uid){
+  return document.querySelector(`input[name="${uid}-rbase"]:checked`)?.value||'benefit';
+}
+
+function toggleKnown(uid,k){
+  const btn=document.getElementById(`${uid}-k-${k}`);
+  btn.classList.toggle('sel');
+  rebuildRevSTDLTDInputs(uid);
+}
+
+function wizSTDLTDReset(uid){
+  // rebuild known-selector based on rbase
+  const rb=getRevRateBase(uid);
+  const fields=rb==='salary'?REVSTD_FIELDS_SALARY:REVSTD_FIELDS_BENEFIT;
+  const selEl=document.getElementById(uid+'-known-sel');
+  if(selEl){
+    selEl.innerHTML=Object.keys(fields).map(k=>
+      `<button class="btn-known" id="${uid}-k-${k}" onclick="toggleKnown('${uid}','${k}')">${fields[k].label}</button>`
+    ).join('');
+  }
+  // update rate-base toggle labels
+  ['benefit','salary'].forEach(v=>{
+    const lbl=document.getElementById(`${uid}-rb-lbl-${v}`);
+    if(lbl) lbl.classList.toggle('rb-active', v===rb);
+  });
+  rebuildRevSTDLTDInputs(uid);
+}
+
+function rebuildRevSTDLTDInputs(uid){
+  const rb=getRevRateBase(uid);
+  const fields=rb==='salary'?REVSTD_FIELDS_SALARY:REVSTD_FIELDS_BENEFIT;
+  const allKeys=Object.keys(fields);
+  const known=allKeys.filter(k=>document.getElementById(`${uid}-k-${k}`)?.classList.contains('sel'));
+  const unknown=allKeys.filter(k=>!known.includes(k));
+  const fld=document.getElementById(uid+'-input-fields');
+  if(!fld)return;
+  let h='';
+  known.forEach(k=>{
+    h+=`<div class="col-3 mb-2"><label class="lbl">${fields[k].label}</label>
+      <input class="inp" id="${uid}-i-${k}" placeholder="${fields[k].ph}"/></div>`;
+  });
+  fld.innerHTML=h;
+  const si=document.getElementById(uid+'-solve-info');
+  if(unknown.length===1){
+    si.innerHTML=`<span style="color:var(--tel);font-weight:700">Will solve for: ${fields[unknown[0]].label}</span>`;
+  } else if(unknown.length===0){
+    si.innerHTML=`<span style="color:var(--grn);font-weight:700">All fields known — will verify consistency</span>`;
+  } else if(known.length===0){
+    si.innerHTML=`Select which values you have above`;
+  } else {
+    si.innerHTML=`<span style="color:var(--amb);font-weight:700">Select more known values to isolate one unknown (${unknown.length} unknowns remain)</span>`;
+  }
+}
+
+function calcRevSTDLTD(uid){
+  const isS=document.querySelector(`input[name="${uid}-type"]:checked`)?.value==='STD';
+  const rb=getRevRateBase(uid);
+  const pc=getPCValue(document.getElementById(uid+'-pc')?.value||'Bi-Weekly (26)');
+  const fields=rb==='salary'?REVSTD_FIELDS_SALARY:REVSTD_FIELDS_BENEFIT;
+  const allKeys=Object.keys(fields);
+  const known=allKeys.filter(k=>document.getElementById(`${uid}-k-${k}`)?.classList.contains('sel'));
+  const unknown=allKeys.filter(k=>!known.includes(k));
+  const get=k=>sf(document.getElementById(`${uid}-i-${k}`)?.value);
+
+  if(known.length===0){toast('Select which values you have','err');return;}
+  if(unknown.length>1){toast('Need more known values to solve','err');return;}
+
+  const divisor=isS?10:100,periodDiv=isS?52:12;
+  const solve=unknown[0]||'verify';
+  let result='',working='',verify='';
+
+  try{
+    if(rb==='salary'){
+      /* ── SALARY-BASED REVERSE ── */
+      // Formula: Premium = Rate × PeriodSalary ÷ divisor
+      // => Rate = Monthly × divisor / PeriodSalary
+      // => Salary = Monthly × divisor / Rate × periodDiv
+      // => PP = perPay(Rate × PeriodSalary / divisor, pc)
+      const pp=known.includes('pp')?get('pp'):null;
+      const sal=known.includes('sal')?get('sal'):null;
+      const rate=known.includes('rate')?get('rate'):null;
+
+      if(solve==='rate'){
+        if(!pp||!sal){toast('Need Per-Pay and Salary to solve Rate','err');return;}
+        const monthly=moFromPP(pp,pc);
+        const period=sal/periodDiv;
+        const r=monthly*divisor/period;
+        result=`Rate = ${r.toFixed(6)}`;
+        working=`Period Salary=$${period.toFixed(2)}  Monthly Prem=$${monthly.toFixed(4)}`;
+        verify=`Verify Per-Pay: ${fmt(perPay(r*period/divisor,pc))}`;
+      } else if(solve==='pp'){
+        if(!sal||!rate){toast('Need Salary and Rate to solve Per-Pay','err');return;}
+        const period=sal/periodDiv;
+        const prem=rate*period/divisor;
+        const ppv=perPay(prem,pc);
+        result=`Per-Pay = ${fmt(ppv)}`;
+        working=`Period Salary=$${period.toFixed(2)}  Premium=$${prem.toFixed(4)}`;
+        verify=`Monthly Premium: $${prem.toFixed(4)}`;
+      } else if(solve==='sal'){
+        if(!pp||!rate){toast('Need Per-Pay and Rate to solve Salary','err');return;}
+        const monthly=moFromPP(pp,pc);
+        const period=monthly*divisor/rate;
+        const annSal=period*periodDiv;
+        result=`Annual Salary = $${annSal.toFixed(2)}`;
+        working=`Monthly Prem=$${monthly.toFixed(4)}  Period Salary=$${period.toFixed(2)}`;
+        verify=`Verify Per-Pay: ${fmt(perPay(rate*period/divisor,pc))}`;
+      } else {
+        // verify
+        if(!pp||!sal||!rate){toast('Need all three to verify','err');return;}
+        const period=sal/periodDiv;
+        const prem=rate*period/divisor;
+        const ppCalc=perPay(prem,pc);
+        result=`Verification OK`;
+        working=`Period=$${period.toFixed(2)}  Premium=$${prem.toFixed(4)}`;
+        verify=`Calculated Per-Pay: ${fmt(ppCalc)}  |  Entered: ${fmt(pp)}`;
+      }
+    } else {
+      /* ── BENEFIT-BASED REVERSE (original logic) ── */
+      let pp=known.includes('pp')?get('pp'):null;
+      let sal=known.includes('sal')?get('sal'):null;
+      let pct=known.includes('pct')?get('pct'):null;
+      let maxb=known.includes('maxb')?get('maxb'):0;
+      let rate=known.includes('rate')?get('rate'):null;
+
+      if(solve==='rate'||solve==='verify'){
+        if(!sal||!pp){toast('Need Salary and Per-Pay to solve Rate','err');return;}
+        const period=sal/periodDiv,pctAmt=pct?period*(pct/100):null;
+        const benefit=pctAmt?(maxb>0?Math.min(pctAmt,maxb):pctAmt):null;
+        if(!benefit){toast('Need Benefit % to compute benefit','err');return;}
+        const monthly=moFromPP(pp,pc);
+        rate=monthly*divisor/benefit;
+        result=`Rate = ${rate.toFixed(6)}`;
+        working=`Benefit=$${benefit.toFixed(2)}  Monthly Premium=$${monthly.toFixed(4)}`;
+        verify=`Verify Per-Pay: ${fmt(perPay(rate*benefit/divisor,pc))}`;
+      } else if(solve==='pp'){
+        if(!sal||!rate){toast('Need Salary and Rate to solve Per-Pay','err');return;}
+        const period=sal/periodDiv,pctAmt=pct?period*(pct/100):null;
+        const benefit=pctAmt?(maxb>0?Math.min(pctAmt,maxb):pctAmt):null;
+        if(!benefit){toast('Need Benefit % to compute benefit','err');return;}
+        const premium=rate*benefit/divisor;
+        pp=perPay(premium,pc);
+        result=`Per-Pay = ${fmt(pp)}`;
+        working=`Benefit=$${benefit.toFixed(2)}  Premium=$${premium.toFixed(4)}`;
+        verify=`Monthly Premium: $${premium.toFixed(4)}`;
+      } else if(solve==='sal'){
+        if(!pp||!rate||!pct){toast('Need Per-Pay, Rate, and Benefit % to solve Salary','err');return;}
+        const monthly=moFromPP(pp,pc);
+        const benefit=monthly*divisor/rate;
+        const period=benefit/(pct/100);
+        sal=period*periodDiv;
+        result=`Annual Salary = $${sal.toFixed(2)}`;
+        working=`Monthly Prem=$${monthly.toFixed(4)}  Benefit=$${benefit.toFixed(2)}`;
+        verify=`Verify Period Salary: $${period.toFixed(2)}`;
+      } else if(solve==='pct'){
+        if(!pp||!rate||!sal){toast('Need Per-Pay, Rate, and Salary to solve Benefit %','err');return;}
+        const monthly=moFromPP(pp,pc);
+        const benefit=monthly*divisor/rate;
+        const period=sal/periodDiv;
+        pct=(benefit/period)*100;
+        result=`Benefit % = ${pct.toFixed(4)}%`;
+        working=`Benefit=$${benefit.toFixed(2)}  Period=$${period.toFixed(2)}`;
+        verify=`Verify monthly prem: $${(rate*benefit/divisor).toFixed(4)}`;
+      } else if(solve==='maxb'){
+        if(!pp||!rate){toast('Need Per-Pay and Rate to solve Max Benefit','err');return;}
+        const monthly=moFromPP(pp,pc);
+        const benefit=monthly*divisor/rate;
+        maxb=benefit;
+        result=`Max Benefit = $${maxb.toFixed(2)}`;
+        working=`Monthly Prem=$${monthly.toFixed(4)}`;
+        verify=`The benefit that yields this per-pay at this rate`;
+      }
+    }
+  }catch(e){toast('Calculation error','err');return;}
+
+  document.getElementById(uid+'-rtarget').textContent=
+    (rb==='salary'?REVSTD_FIELDS_SALARY:REVSTD_FIELDS_BENEFIT)[solve]?.label||'Verification';
+  document.getElementById(uid+'-rw').textContent=working;
+  const rr=document.getElementById(uid+'-rr');rr.textContent=result;flash(rr);
+  document.getElementById(uid+'-rv').textContent=verify;
+  document.getElementById(uid+'-res').style.display='flex';
+  snapshot();toast('Solved successfully');
+}
+
+/* ══════════════════════════════════════
+   REVERSE VOL LIFE / CI — SMART WIZARD
+══════════════════════════════════════ */
+function addRevIncr(){
+  snapshot();
+  const n=nid('ri'),uid=`ri-${n}`;
+  const div=document.createElement('div');div.className='ccard';div.id=uid;
+  div.innerHTML=`
+  <div class="ccard-hdr teal">
+    <div class="ccard-hdr-left"><i class="bi bi-arrow-left-right"></i> Vol Life / CI Reverse #${n} — Smart Solver</div>
+    <div class="ccard-hdr-right">
+      <button class="btn-save-card" onclick="openSaveModal('${uid}','VolLife Reverse')"><i class="bi bi-file-earmark-excel"></i> Save</button>
+      <button class="btn-remove" onclick="removeCard(this)"><i class="bi bi-x"></i> Remove</button>
+    </div>
+  </div>
+  <div class="ccard-body">
+    <div class="fnote teal"><i class="bi bi-lightbulb"></i> Select which values you have — the solver finds the missing piece automatically.</div>
+    <div class="wizard-panel">
+      <div class="wizard-step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Plan &amp; Pay Cycle</div>
+          <div class="row gap-2">
+            <div class="col-4"><label class="lbl">Plan Name</label><input class="inp" id="${uid}-pname" placeholder="Vol Term Life"/></div>
+            <div class="col-4"><label class="lbl">Pay Cycle</label><select class="inp" id="${uid}-pc">${pcOpts()}</select></div>
+          </div>
+        </div>
+      </div>
+      <div class="wizard-step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">What values do you have?</div>
+          <div class="step-desc">Select all that apply. Formula: Premium = Rate × Election ÷ 1,000</div>
+          <div class="known-selector">
+            <button class="btn-known" id="${uid}-k-pp" onclick="toggleKnownRI('${uid}','pp')">Per-Pay Amount</button>
+            <button class="btn-known" id="${uid}-k-rate" onclick="toggleKnownRI('${uid}','rate')">Rate / 1,000</button>
+            <button class="btn-known" id="${uid}-k-elec" onclick="toggleKnownRI('${uid}','elec')">Election Amount</button>
+          </div>
+        </div>
+      </div>
+      <div class="wizard-step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Add Members &amp; Solve</div>
+          <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem" id="${uid}-solve-info"></div>
+          <div class="tier-wrap">
+            <div class="tier-hdr" style="grid-template-columns:90px 1fr 1fr 1fr 1fr 34px">
+              <span>Member</span><span>Per-Pay ($)</span><span>Rate/1,000</span><span>Election ($)</span><span>Result</span><span></span>
+            </div>
+            <div id="${uid}-rows"></div>
+          </div>
+          <div class="mt-2">
+            <button class="btn btn-out btn-sm" onclick="addRevIncrRow('${uid}')"><i class="bi bi-plus-lg"></i> Add Member Row</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('rev-incr-cards').appendChild(div);
+  ['EE','SP','CH'].forEach(m=>addRevIncrRow(uid,m));
+  toggleKnownRI(uid,'');
+}
+const RIFF={pp:'Per-Pay',rate:'Rate/1,000',elec:'Election ($)'};
+function toggleKnownRI(uid,k){
+  if(k){const b=document.getElementById(`${uid}-k-${k}`);if(b)b.classList.toggle('sel');}
+  const known=['pp','rate','elec'].filter(kk=>document.getElementById(`${uid}-k-${kk}`)?.classList.contains('sel'));
+  const unk=['pp','rate','elec'].filter(kk=>!known.includes(kk));
+  const si=document.getElementById(uid+'-solve-info');
+  if(unk.length===1){si.innerHTML=`<span style="color:var(--tel);font-weight:700">Will solve for: ${RIFF[unk[0]]}</span>`;}
+  else if(unk.length===0){si.innerHTML=`<span style="color:var(--grn);font-weight:700">All known — will verify</span>`;}
+  else{si.innerHTML=`Select more known values`;}
+}
+function addRevIncrRow(uid,lbl){
+  lbl=lbl||'';const id=`${uid}-r${nid(uid+'-ri')}`;
+  const opts=['EE','SP','CH','DP','Other'].map(m=>`<option${m===lbl?' selected':''}>${m}</option>`).join('');
+  const div=document.createElement('div');div.className='tier-row';
+  div.style.gridTemplateColumns='90px 1fr 1fr 1fr 1fr 34px';
+  div.innerHTML=`
+    <select class="inp">${opts}</select>
+    <input class="inp" id="${id}-pp" placeholder="Per-Pay" oninput="calcRevIncrRow('${uid}','${id}')"/>
+    <input class="inp" id="${id}-rate" placeholder="Rate" oninput="calcRevIncrRow('${uid}','${id}')"/>
+    <input class="inp" id="${id}-elec" placeholder="Election" oninput="calcRevIncrRow('${uid}','${id}')"/>
+    <span class="pill teal" id="${id}-res">—</span>
+    <button class="btn btn-tel btn-sm" onclick="calcRevIncrRow('${uid}','${id}')"><i class="bi bi-lightning-charge"></i></button>`;
+  document.getElementById(uid+'-rows').appendChild(div);
+}
+function calcRevIncrRow(uid,id){
+  const known=['pp','rate','elec'].filter(k=>document.getElementById(`${uid}-k-${k}`)?.classList.contains('sel'));
+  const unk=['pp','rate','elec'].filter(k=>!known.includes(k));
+  const pc=getPCValue(document.getElementById(uid+'-pc')?.value||'Bi-Weekly (26)');
+  const pp=sf(document.getElementById(id+'-pp')?.value);
+  const rate=sf(document.getElementById(id+'-rate')?.value);
+  const elec=sf(document.getElementById(id+'-elec')?.value);
+  const re=document.getElementById(id+'-res');
+  if(unk.length!==1){if(re)re.textContent='Select unknowns';return;}
+  const solve=unk[0];
+  let result='';
+  if(solve==='elec'){
+    if(!rate){if(re)re.textContent='Need Rate';return;}
+    const monthly=moFromPP(pp,pc);
+    result='$'+(monthly*1000/rate).toFixed(0);
+  } else if(solve==='rate'){
+    if(!elec){if(re)re.textContent='Need Election';return;}
+    const monthly=moFromPP(pp,pc);
+    result=(monthly*1000/elec).toFixed(4);
+  } else if(solve==='pp'){
+    if(!rate||!elec){if(re)re.textContent='Need Rate+Election';return;}
+    const prem=rate*elec/1000;
+    result=fmt(perPay(prem,pc));
+  }
+  if(re){re.textContent=result;flash(re);}
+}
+
+/* ══════════════════════════════════════
+   EXCEL COLLECTION HELPERS
+══════════════════════════════════════ */
+function collectTierRows(card,uid){
+  const rows=[];
+  const mode=card.querySelector(`input[name="${uid}-mode"]:checked`)?.value||'Custom';
+  const isAge=mode==='Age-Banded';
+  const pc=card.querySelector(`#${uid}-pc`)?.value||'';
+  if(isAge){
+    rows.push(['Tier','EE Rate ($)','SP Rate ($)','CH/Child Rate ($)','DP Rate ($)','Total Monthly ($)','Per-Pay ($)','Pay Cycle']);
+  } else {
+    rows.push(['Tier','Monthly Rate ($)','Per-Pay ($)','Pay Cycle']);
+  }
+  card.querySelectorAll('.tier-lbl').forEach(tl=>{
+    const t=tl.textContent.trim();
+    const tid=uid+'-'+t.replace(/\W/g,'_');
+    if(t==='EE+CH'&&isAge){
+      const eeRate=card.querySelector(`#${tid}-ee`)?.value||'';
+      const grandTotal=card.querySelector(`#${tid}-ch-grand`)?.textContent||'';
+      const grandPP=card.querySelector(`#${tid}-ch-pp`)?.textContent||'';
+      rows.push(['EE+CH',eeRate,'','(see children below)','',grandTotal,grandPP,pc]);
+      card.querySelector(`#${tid}-children`)?.querySelectorAll('.ch-subrow').forEach(crow=>{
+        const label=crow.querySelector('.ch-lbl')?.textContent?.trim()||'Child';
+        const crate=crow.querySelector('[id$="-rate"]')?.value||'';
+        const csub=crow.querySelector('[id$="-sub"]')?.textContent||'';
+        const cpp=crow.querySelector('[id$="-pp"]')?.textContent||'';
+        rows.push([`  └ ${label}`,'',crate,'',csub,'',cpp,pc]);
+      });
+    } else if(t==='EE+Family'&&isAge){
+      const eeRate=card.querySelector(`#${tid}-ee`)?.value||'';
+      const spRate=card.querySelector(`#${tid}-sp`)?.value||'';
+      const grandTotal=card.querySelector(`#${tid}-ch-grand`)?.textContent||'';
+      const grandPP=card.querySelector(`#${tid}-ch-pp`)?.textContent||'';
+      rows.push(['EE+Family',eeRate,spRate,'(see children below)','',grandTotal,grandPP,pc]);
+      card.querySelector(`#${tid}-children`)?.querySelectorAll('.ch-subrow').forEach(crow=>{
+        const label=crow.querySelector('.ch-lbl')?.textContent?.trim()||'Child';
+        const csub=crow.querySelectorAll('.pill')[1]?.textContent||'';
+        const cpp=crow.querySelectorAll('.pill')[2]?.textContent||'';
+        rows.push([`  └ ${label}`,'','','',csub,'',cpp,pc]);
+      });
+    } else if(isAge){
+      const ee=card.querySelector(`#${tid}-ee`)?.value||'';
+      const sp=card.querySelector(`#${tid}-sp`)?.value||'';
+      const dp=card.querySelector(`#${tid}-dp2`)?.value||'';
+      const total=card.querySelector(`#${tid}-total`)?.textContent||'';
+      const res=card.querySelector(`#${tid}-res`)?.textContent||'';
+      rows.push([t,ee,sp,dp,'',total,'',res,pc]);
+    } else {
+      const rate=card.querySelector(`#${tid}-rate`)?.value||'';
+      const res=card.querySelector(`#${tid}-res`)?.textContent||'';
+      rows.push([t,rate,'','','','','',res,pc]);
+    }
+  });
+  return rows;
+}
+
+function collectSTDLTDRows(card,uid,type){
+  const rows=[['Field','Value']];
+  const pc=card.querySelector(`#${uid}-pc`)?.value||'';
+  const rb=card.querySelector(`input[name="${uid}-rbase"]:checked`)?.value||'benefit';
+  const isHourly=card.querySelector(`#${uid}-tab-hourly`)?.classList.contains('active');
+  const roundSel=card.querySelector(`#${uid}-round`)?.value||'none';
+  rows.push(['Plan Type',type]);
+  rows.push(['Plan Name',card.querySelector(`#${uid}-pname`)?.value||type]);
+  rows.push(['Pay Cycle',pc]);
+  rows.push(['Rate Applied To', rb==='salary'?'Salary (Period)':'Benefit']);
+  rows.push(['Salary Input Mode', isHourly?'Hourly':'Annual']);
+  if(isHourly){
+    rows.push(['Hourly Rate ($)',card.querySelector(`#${uid}-hr-rate`)?.value||'']);
+    rows.push(['Hours / Week',card.querySelector(`#${uid}-hr-hours`)?.value||'']);
+    rows.push(['Weeks / Year',card.querySelector(`#${uid}-hr-weeks`)?.value||'']);
+  }
+  rows.push(['Annual Salary ($)',card.querySelector(`#${uid}-sal`)?.value||'']);
+  if(rb==='benefit'){
+    const pctFld=isHourly?`#${uid}-pct-h`:`#${uid}-pct`;
+    const maxbFld=isHourly?`#${uid}-maxb-h`:`#${uid}-maxb`;
+    rows.push(['Benefit %',card.querySelector(pctFld)?.value||'']);
+    rows.push(['Max Benefit ($)',card.querySelector(maxbFld)?.value||'']);
+  }
+  const rateFld=isHourly?`#${uid}-rate-h`:`#${uid}-rate`;
+  rows.push(['Rate',card.querySelector(rateFld)?.value||'']);
+  rows.push(['Rounding Rule', roundSel==='none'?'No Rounding':(ROUND_RULES[roundSel]?.label||roundSel)]);
+  rows.push([]);
+  rows.push(['Results','']);
+  rows.push(['Salary Source',card.querySelector(`#${uid}-rsrc`)?.textContent||'—']);
+  rows.push(['Period Salary',card.querySelector(`#${uid}-rp`)?.textContent||'—']);
+  if(rb==='benefit'){
+    rows.push(['% Amount',card.querySelector(`#${uid}-ra`)?.textContent||'—']);
+    rows.push(['Benefit Used',card.querySelector(`#${uid}-rb2`)?.textContent||'—']);
+  }
+  rows.push(['Monthly Premium',card.querySelector(`#${uid}-rprem`)?.textContent||'—']);
+  rows.push(['Per-Pay Amount (after rounding)',card.querySelector(`#${uid}-rpp`)?.textContent||'—']);
+  return rows;
+}
+
+function collectVolLifeRows(card,uid){
+  const rows=[['Member','Age','Rate/1,000','Election ($)','Premium ($)','Per-Pay ($)']];
+  card.querySelectorAll(`#${uid}-members .tier-row`).forEach(row=>{
+    rows.push([
+      row.querySelector('select')?.value||'',
+      row.querySelector('[id$="-age"]')?.value||'',
+      row.querySelector('[id$="-rate"]')?.value||'',
+      row.querySelector('[id$="-elec"]')?.value||'',
+      row.querySelector('[id$="-prem"]')?.textContent||'',
+      row.querySelector('[id$="-pp"]')?.textContent||''
+    ]);
+  });
+  return rows;
+}
+
+function collectRevTierRows(card,uid){
+  const rows=[['Tier','Per-Pay ($)','Monthly Rate','Annual Total']];
+  card.querySelectorAll(`#${uid}-rows .tier-row`).forEach(row=>{
+    const inps=row.querySelectorAll('input');
+    rows.push([inps[0]?.value||'',inps[1]?.value||'',
+      row.querySelector('[id$="-mo"]')?.textContent||'',
+      row.querySelector('[id$="-yr"]')?.textContent||'']);
+  });
+  return rows;
+}
+
+function collectRevSTDLTDRows(card,uid){
+  const rb=card.querySelector(`input[name="${uid}-rbase"]:checked`)?.value||'benefit';
+  const rows=[['Field','Value']];
+  rows.push(['Plan Type',card.querySelector(`input[name="${uid}-type"]:checked`)?.value||'']);
+  rows.push(['Pay Cycle',card.querySelector(`#${uid}-pc`)?.value||'']);
+  rows.push(['Rate Applied To', rb==='salary'?'Salary (Period)':'Benefit']);
+  rows.push(['Solve Target',card.querySelector(`#${uid}-rtarget`)?.textContent||'']);
+  rows.push(['Working',card.querySelector(`#${uid}-rw`)?.textContent||'']);
+  rows.push(['Result',card.querySelector(`#${uid}-rr`)?.textContent||'']);
+  rows.push(['Verification',card.querySelector(`#${uid}-rv`)?.textContent||'']);
+  return rows;
+}
+
+function collectRevIncrRows(card,uid){
+  const rows=[['Member','Per-Pay ($)','Rate/1,000','Election ($)','Result']];
+  card.querySelectorAll(`#${uid}-rows .tier-row`).forEach(row=>{
+    rows.push([
+      row.querySelector('select')?.value||'',
+      row.querySelector('[id$="-pp"]')?.value||'',
+      row.querySelector('[id$="-rate"]')?.value||'',
+      row.querySelector('[id$="-elec"]')?.value||'',
+      row.querySelector('[id$="-res"]')?.textContent||''
+    ]);
+  });
+  return rows;
+}
+
+/* ══════════════════════════════════════
+   STYLED EXCEL EXPORT
+══════════════════════════════════════ */
+const XL_COLORS={
+  Medical:         {title:'1E3A8A', header:'2563EB', accent:'DBEAFE', alt:'EFF6FF'},
+  Dental:          {title:'065F46', header:'059669', accent:'D1FAE5', alt:'ECFDF5'},
+  Vision:          {title:'312E81', header:'6366F1', accent:'E0E7FF', alt:'EEF2FF'},
+  Accident:        {title:'78350F', header:'D97706', accent:'FEF3C7', alt:'FFFBEB'},
+  STD:             {title:'1E1B4B', header:'7C3AED', accent:'EDE9FE', alt:'F5F3FF'},
+  LTD:             {title:'3B0764', header:'9333EA', accent:'F3E8FF', alt:'FAF5FF'},
+  'Vol Life':      {title:'0C4A6E', header:'0284C7', accent:'E0F2FE', alt:'F0F9FF'},
+  'Critical Illness':{title:'831843', header:'DB2777', accent:'FCE7F3', alt:'FDF2F8'},
+  'Rev-Tier':      {title:'134E4A', header:'0D9488', accent:'CCFBF1', alt:'F0FDFA'},
+  'Rev-STD-LTD':   {title:'1E3A5F', header:'1D4ED8', accent:'DBEAFE', alt:'EFF6FF'},
+  'Rev-Vol Life':  {title:'064E3B', header:'047857', accent:'D1FAE5', alt:'ECFDF5'},
+  Summary:         {title:'0F172A', header:'1E293B', accent:'F1F5F9', alt:'F8FAFC'},
+};
+
+function xlCell(v,bold,bgRGB,fontRGB,align,italic,sz){
+  const c={v:v??'',t:typeof v==='number'?'n':'s'};
+  c.s={
+    font:{bold:!!bold,italic:!!italic,sz:sz||10,color:{rgb:fontRGB||'000000'}},
+    fill:bgRGB?{patternType:'solid',fgColor:{rgb:bgRGB}}:{patternType:'none'},
+    alignment:{horizontal:align||'left',vertical:'center',wrapText:false},
+    border:{
+      top:{style:'thin',color:{rgb:'E2E8F0'}},bottom:{style:'thin',color:{rgb:'E2E8F0'}},
+      left:{style:'thin',color:{rgb:'E2E8F0'}},right:{style:'thin',color:{rgb:'E2E8F0'}}
+    }
+  };
+  return c;
+}
+
+function buildSheet(title,company,dt,headerCols,dataRows,clr){
+  const ws={},NCOLS=headerCols.length;
+  let R=0;
+  function setRow(rowArr,bg,fontClr,bold,sz,italic){
+    rowArr.forEach((v,c)=>{
+      ws[XLSX.utils.encode_cell({r:R,c})]=xlCell(v,bold,bg,fontClr,'left',italic,sz);
+    });
+    for(let c=rowArr.length;c<NCOLS;c++)
+      ws[XLSX.utils.encode_cell({r:R,c})]=xlCell('',bold,bg,fontClr,'left',italic,sz);
+    R++;
+  }
+  setRow([title],clr.title,'FFFFFF',true,14);
+  ws[XLSX.utils.encode_cell({r:R-1,c:0})]=xlCell(title,true,clr.title,'FFFFFF','left',false,14);
+  ws['!merges']=ws['!merges']||[];
+  if(NCOLS>1) ws['!merges'].push({s:{r:R-1,c:0},e:{r:R-1,c:NCOLS-1}});
+  setRow(['Company: '+company,'','','','Effective Date: '+dt],clr.accent,'334155',true,10);
+  if(NCOLS>1){ws['!merges'].push({s:{r:R-1,c:0},e:{r:R-1,c:2}});ws['!merges'].push({s:{r:R-1,c:4},e:{r:R-1,c:NCOLS-1}});}
+  setRow(Array(NCOLS).fill(''),null,'64748B',false,6);
+  setRow(headerCols,clr.header,'FFFFFF',true,10);
+  dataRows.forEach((row,i)=>{
+    const isChild=typeof row[0]==='string'&&row[0].startsWith('  └');
+    const isPlanHdr=typeof row[0]==='string'&&row[0].startsWith('─');
+    const altBg=i%2===1?clr.alt:null;
+    const bg=isPlanHdr?clr.accent:isChild?'F8FAFC':altBg;
+    setRow(row,bg,'1E293B',isPlanHdr,10,isChild);
+  });
+  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:R-1,c:NCOLS-1}});
+  ws['!cols']=headerCols.map((_,i)=>({wch:i===0?22:i<4?16:14}));
+  ws['!rows']=[];
+  for(let r=0;r<R;r++) ws['!rows'].push({hpt:r===0?26:r===2?8:18});
+  return ws;
+}
+
+function styleHeader(ws,headerRowIdx,colCount){
+  for(let c=0;c<colCount;c++){
+    const addr=XLSX.utils.encode_cell({r:headerRowIdx,c});
+    if(!ws[addr])continue;
+    ws[addr].s={font:{bold:true},fill:{fgColor:{rgb:'D9E1F2'}}};
+  }
+}
+
+/* ══════════════════════════════════════
+   SAVE SINGLE CARD TO EXCEL
+══════════════════════════════════════ */
+function saveCardToExcel(uid,section,fname){
+  if(typeof XLSX==='undefined'){toast('XLSX library not loaded','err');return;}
+  const card=document.getElementById(uid);
+  if(!card){toast('Card not found','err');return;}
+  const wb=XLSX.utils.book_new();
+  const company=document.getElementById('company-name')?.value||'';
+  const dt=document.getElementById('eff-date')?.value||new Date().toISOString().slice(0,10);
+  const pname=card.querySelector(`#${uid}-pname`)?.value||section;
+  const meta=[
+    ['InsureCalc Pro — Rate Calculation Export'],
+    ['Company:',company,'Effective Date:',dt],
+    ['Plan:',pname,'Section:',section],
+    []
+  ];
+  let dataRows=[];
+  if(card.querySelector(`#${uid}-table`)){
+    dataRows=collectTierRows(card,uid);
+  } else if(card.querySelector(`#${uid}-rpp`)){
+    const type=section.toUpperCase().includes('LTD')?'LTD':'STD';
+    dataRows=collectSTDLTDRows(card,uid,type);
+  } else if(card.querySelector(`#${uid}-members`)){
+    dataRows=collectVolLifeRows(card,uid);
+  } else if(card.querySelector(`#${uid}-rtarget`)){
+    dataRows=collectRevSTDLTDRows(card,uid);
+  } else if(card.querySelector(`#${uid}-rows`)){
+    if(card.querySelector('[id$="-mo"]')) dataRows=collectRevTierRows(card,uid);
+    else dataRows=collectRevIncrRows(card,uid);
+  }
+  const allRows=[...meta,...dataRows];
+  const ws=XLSX.utils.aoa_to_sheet(allRows);
+  ws['!cols']=Array(8).fill({wch:22});
+  XLSX.utils.book_append_sheet(wb,ws,section.slice(0,31));
+  XLSX.writeFile(wb,fname.endsWith('.xlsx')?fname:fname+'.xlsx');
+  toast('Saved to Excel ✓');
+}
+
+/* ══════════════════════════════════════
+   EXPORT ALL TO EXCEL
+══════════════════════════════════════ */
+function exportAllCSV(){
+  if(typeof XLSX==='undefined'){toast('XLSX library not loaded','err');return;}
+  const wb=XLSX.utils.book_new();
+  const company=document.getElementById('company-name')?.value||'Company';
+  const dt=document.getElementById('eff-date')?.value||new Date().toISOString().slice(0,10);
+  let totalSheets=0;
+
+  const tierSections=[
+    {name:'Medical', ids:['medical-cards'],  clrKey:'Medical'},
+    {name:'Dental',  ids:['dental-cards'],   clrKey:'Dental'},
+    {name:'Vision',  ids:['vision-cards'],   clrKey:'Vision'},
+    {name:'Accident',ids:['accident-cards'], clrKey:'Accident'},
+  ];
+
+  tierSections.forEach(({name,ids,clrKey})=>{
+    const clr=XL_COLORS[clrKey];
+    const hdrAge=['Tier','EE Rate ($)','SP Rate ($)','DP Rate ($)','Total Monthly ($)','Per-Pay ($)','Pay Cycle'];
+    let allData=[];
+    ids.forEach(cid=>{
+      document.getElementById(cid)?.querySelectorAll('.ccard').forEach(card=>{
+        const uid=card.id;
+        const pname=card.querySelector(`#${uid}-pname`)?.value||name;
+        const pc=card.querySelector(`#${uid}-pc`)?.value||'';
+        const isAge=card.querySelector(`input[name="${uid}-mode"]:checked`)?.value==='Age-Banded';
+        allData.push(['─── Plan: '+pname+' ───','','','','','','']);
+        card.querySelectorAll('.tier-lbl').forEach(tl=>{
+          const t=tl.textContent.trim();
+          const tid=uid+'-'+t.replace(/\W/g,'_');
+          if(t==='EE+CH'&&isAge){
+            const ee=card.querySelector(`#${tid}-ee`)?.value||'';
+            const gTotal=card.querySelector(`#${tid}-ch-grand`)?.textContent||'—';
+            const gPP=card.querySelector(`#${tid}-ch-pp`)?.textContent||'—';
+            allData.push(['EE+CH',ee,'','',gTotal,gPP,pc]);
+            card.querySelector(`#${tid}-children`)?.querySelectorAll('.ch-subrow').forEach(crow=>{
+              const lbl=crow.querySelector('.ch-lbl')?.textContent?.trim()||'Child';
+              const cr=crow.querySelector('[id$="-rate"]')?.value||'';
+              const sub=crow.querySelector('[id$="-sub"]')?.textContent||'—';
+              const cpp=crow.querySelector('[id$="-pp"]')?.textContent||'—';
+              allData.push(['  └ '+lbl,'',cr,'',sub,cpp,pc]);
+            });
+          } else if(t==='EE+Family'&&isAge){
+            const ee=card.querySelector(`#${tid}-ee`)?.value||'';
+            const sp=card.querySelector(`#${tid}-sp`)?.value||'';
+            const gTotal=card.querySelector(`#${tid}-ch-grand`)?.textContent||'—';
+            const gPP=card.querySelector(`#${tid}-ch-pp`)?.textContent||'—';
+            allData.push(['EE+Family',ee,sp,'',gTotal,gPP,pc]);
+            card.querySelector(`#${tid}-children`)?.querySelectorAll('.ch-subrow').forEach(crow=>{
+              const lbl=crow.querySelector('.ch-lbl')?.textContent?.trim()||'Child';
+              const pils=crow.querySelectorAll('.pill');
+              allData.push(['  └ '+lbl,'','','',pils[1]?.textContent||'—',pils[2]?.textContent||'—',pc]);
+            });
+          } else if(isAge){
+            const ee=card.querySelector(`#${tid}-ee`)?.value||'';
+            const sp=card.querySelector(`#${tid}-sp`)?.value||'';
+            const dp=card.querySelector(`#${tid}-dp2`)?.value||'';
+            const tot=card.querySelector(`#${tid}-total`)?.textContent||'—';
+            const res=card.querySelector(`#${tid}-res`)?.textContent||'—';
+            allData.push([t,ee,sp,dp,tot,res,pc]);
+          } else {
+            const rate=card.querySelector(`#${tid}-rate`)?.value||'';
+            const res=card.querySelector(`#${tid}-res`)?.textContent||'—';
+            allData.push([t,rate,'','','',res,pc]);
+          }
+        });
+        allData.push(['','','','','','','']);
+      });
+    });
+    if(allData.length>0){
+      const ws=buildSheet(name+' — Rate Calculation',company,dt,hdrAge,allData,clr);
+      XLSX.utils.book_append_sheet(wb,ws,name);totalSheets++;
+    }
+  });
+
+  ['STD','LTD'].forEach(type=>{
+    const cid=type.toLowerCase()+'-cards';
+    const clr=XL_COLORS[type];
+    const hdr=['Plan Name','Rate Applied To','Salary ($)','Benefit/Period ($)','Rate','Premium ($)','Per-Pay ($)','Pay Cycle'];
+    const allData=[];
+    document.getElementById(cid)?.querySelectorAll('.ccard').forEach(card=>{
+      const uid=card.id;
+      const pname=card.querySelector(`#${uid}-pname`)?.value||type;
+      const pc=card.querySelector(`#${uid}-pc`)?.value||'';
+      const rb=card.querySelector(`input[name="${uid}-rbase"]:checked`)?.value||'benefit';
+      const salary=card.querySelector(`#${uid}-sal`)?.value||'';
+      const rate=card.querySelector(`#${uid}-rate`)?.value||'';
+      const prem=card.querySelector(`#${uid}-rprem`)?.textContent||'';
+      const pp=card.querySelector(`#${uid}-rpp`)?.textContent||'';
+      const benefitUsed=rb==='benefit'?card.querySelector(`#${uid}-rb2`)?.textContent||'':card.querySelector(`#${uid}-rp`)?.textContent||'';
+      allData.push([pname, rb==='salary'?'Salary':'Benefit', salary, benefitUsed, rate, prem, pp, pc]);
+    });
+    if(allData.length>0){
+      const ws=buildSheet(type+' — Rate Calculation',company,dt,hdr,allData,clr);
+      XLSX.utils.book_append_sheet(wb,ws,type);totalSheets++;
+    }
+  });
+
+  [{name:'Vol Life',cid:'vollife-cards',clrKey:'Vol Life'},{name:'Critical Illness',cid:'ci-cards',clrKey:'Critical Illness'}].forEach(({name,cid,clrKey})=>{
+    const clr=XL_COLORS[clrKey];
+    const hdr=['Plan Name','Member','Age','Rate/1,000','Election ($)','Premium ($)','Per-Pay ($)','Pay Cycle',''];
+    const allData=[];
+    document.getElementById(cid)?.querySelectorAll('.ccard').forEach(card=>{
+      const uid=card.id;
+      const pname=card.querySelector(`#${uid}-pname`)?.value||name;
+      const pc=card.querySelector(`#${uid}-pc`)?.value||'';
+      allData.push(['─── Plan: '+pname+' ───','','','','','','','','']);
+      card.querySelector(`#${uid}-members`)?.querySelectorAll('.tier-row').forEach(row=>{
+        allData.push([pname,row.querySelector('select')?.value||'',row.querySelector('[id$="-age"]')?.value||'',
+          row.querySelector('[id$="-rate"]')?.value||'',row.querySelector('[id$="-elec"]')?.value||'',
+          row.querySelector('[id$="-prem"]')?.textContent||'—',row.querySelector('[id$="-pp"]')?.textContent||'—',pc,'']);
+      });
+      allData.push(['','','','','','','','','']);
+    });
+    if(allData.length>0){
+      const ws=buildSheet(name+' — Rate Calculation',company,dt,hdr,allData,clr);
+      XLSX.utils.book_append_sheet(wb,ws,name.slice(0,31));totalSheets++;
+    }
+  });
+
+  const revTierData=[];
+  document.getElementById('rev-tier-cards')?.querySelectorAll('.ccard').forEach(card=>{
+    const uid=card.id;
+    const pname=card.querySelector(`#${uid}-pname`)?.value||'Rev-Tier';
+    revTierData.push(['─── Plan: '+pname+' ───','','','','','']);
+    collectRevTierRows(card,uid).forEach(r=>revTierData.push(r));
+    revTierData.push(['','','','','','']);
+  });
+  if(revTierData.length>0){
+    const ws=buildSheet('Reverse Tier Coverage',company,dt,['Plan / Tier','Per-Pay ($)','Pay Cycle','Monthly ($)','Annual ($)',''],revTierData,XL_COLORS['Rev-Tier']);
+    XLSX.utils.book_append_sheet(wb,ws,'Rev-Tier Coverage');totalSheets++;
+  }
+
+  const revStdData=[];
+  document.getElementById('rev-stdltd-cards')?.querySelectorAll('.ccard').forEach(card=>{
+    collectRevSTDLTDRows(card,card.id).forEach(r=>revStdData.push(r));
+  });
+  if(revStdData.length>0){
+    const ws=buildSheet('Reverse STD/LTD',company,dt,['Field','Value','','','',''],revStdData,XL_COLORS['Rev-STD-LTD']);
+    XLSX.utils.book_append_sheet(wb,ws,'Rev-STD-LTD');totalSheets++;
+  }
+
+  const revVolData=[];
+  document.getElementById('rev-incr-cards')?.querySelectorAll('.ccard').forEach(card=>{
+    collectRevIncrRows(card,card.id).forEach(r=>revVolData.push(r));
+  });
+  if(revVolData.length>0){
+    const ws=buildSheet('Reverse Vol Life / CI',company,dt,['Plan Name','Member','Age','Rate/1,000','Per-Pay ($)','Election ($)','Premium ($)','Pay Cycle',''],revVolData,XL_COLORS['Rev-Vol Life']);
+    XLSX.utils.book_append_sheet(wb,ws,'Rev-Vol Life');totalSheets++;
+  }
+
+  // Summary sheet
+  const sumHdr=['Plan Name','Section','Tier / Member','Monthly ($)','Per-Pay ($)','Pay Cycle'];
+  const sumData=[];
+  [{cid:'medical-cards',label:'Medical'},{cid:'dental-cards',label:'Dental'},{cid:'vision-cards',label:'Vision'},{cid:'accident-cards',label:'Accident'}].forEach(({cid,label})=>{
+    document.getElementById(cid)?.querySelectorAll('.ccard').forEach(card=>{
+      const uid=card.id;
+      const pname=card.querySelector(`#${uid}-pname`)?.value||'';
+      const pc=card.querySelector(`#${uid}-pc`)?.value||'';
+      const isAge=card.querySelector(`input[name="${uid}-mode"]:checked`)?.value==='Age-Banded';
+      card.querySelectorAll('.tier-lbl').forEach(tl=>{
+        const t=tl.textContent.trim();
+        const tid=uid+'-'+t.replace(/\W/g,'_');
+        let res='',monthly='';
+        if(isAge&&(t==='EE+CH'||t==='EE+Family')){res=card.querySelector(`#${tid}-ch-pp`)?.textContent||'';monthly=card.querySelector(`#${tid}-ch-grand`)?.textContent||'';}
+        else if(isAge){res=card.querySelector(`#${tid}-res`)?.textContent||'';monthly=card.querySelector(`#${tid}-total`)?.textContent||'';}
+        else{res=card.querySelector(`#${tid}-res`)?.textContent||'';monthly=card.querySelector(`#${tid}-rate`)?.value||'';}
+        if(res&&res!=='—') sumData.push([pname,label,t,monthly,res,pc]);
+      });
+    });
+  });
+  ['std-cards','ltd-cards'].forEach(cid=>{
+    document.getElementById(cid)?.querySelectorAll('.ccard').forEach(card=>{
+      const uid=card.id;
+      const pname=card.querySelector(`#${uid}-pname`)?.value||'';
+      const pp=card.querySelector(`#${uid}-rpp`)?.textContent||'';
+      const prem=card.querySelector(`#${uid}-rprem`)?.textContent||'';
+      const pc=card.querySelector(`#${uid}-pc`)?.value||'';
+      if(pp&&pp!=='—') sumData.push([pname,cid.includes('std')?'STD':'LTD','Employee',prem,pp,pc]);
+    });
+  });
+  ['vollife-cards','ci-cards'].forEach(cid=>{
+    document.getElementById(cid)?.querySelectorAll('.ccard').forEach(card=>{
+      const uid=card.id;
+      const pname=card.querySelector(`#${uid}-pname`)?.value||'';
+      const pc=card.querySelector(`#${uid}-pc`)?.value||'';
+      card.querySelector(`#${uid}-members`)?.querySelectorAll('.tier-row').forEach(row=>{
+        const mbr=row.querySelector('select')?.value||'';
+        const pp=row.querySelector('[id$="-pp"]')?.textContent||'';
+        const prem=row.querySelector('[id$="-prem"]')?.textContent||'';
+        const label=cid.includes('vollife')?'Vol Life':'Critical Illness';
+        if(pp&&pp!=='—') sumData.push([pname,label,mbr,prem,pp,pc]);
+      });
+    });
+  });
+  if(sumData.length>0){
+    const ws=buildSheet('Summary — All Plans',company,dt,sumHdr,sumData,XL_COLORS['Summary']);
+    ws['!freeze']={xSplit:0,ySplit:4,topLeftCell:'A5',activePane:'bottomLeft',state:'frozen'};
+    XLSX.utils.book_append_sheet(wb,ws,'Summary');totalSheets++;
+  }
+
+  if(totalSheets===0){toast('No calculated data to export yet','err');return;}
+  XLSX.writeFile(wb,`${company}_InsureCalc_${dt}.xlsx`);
+  toast(`✓ Exported ${totalSheets} sheets to Excel`);
+}
+
+/* ══════════════════════════════════════
+   INIT
+══════════════════════════════════════ */
+window.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('eff-date').valueAsDate=new Date();
+  addTier('medical-cards','Medical');
+  addTier('dental-cards','Dental');
+  addTier('vision-cards','Vision');
+  addTier('accident-cards','Accident');
+  addSTDLTD('std-cards','STD');
+  addSTDLTD('ltd-cards','LTD');
+  addVolLife('vollife-cards','Voluntary Life');
+  addVolLife('ci-cards','Critical Illness');
+  addRevTier();
+  addRevSTDLTD();
+  addRevIncr();
+  document.querySelector('.snav-parent[data-group="tier"]').classList.add('open');
+  go('medical');
+  snapshot();
+  document.getElementById('content').addEventListener('change',()=>snapshot(),true);
+});
+</script>
+</body>
+</html>

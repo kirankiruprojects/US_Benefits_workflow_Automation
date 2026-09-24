@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Pre vs Post Comparison — Workforce Junction</title>
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png"/>
+<link rel="apple-touch-icon" href="icons/icon-180.png"/>
+<meta name="theme-color" content="#06436D"/>
+<link rel="stylesheet" href="assets/vendor/fonts/plus-jakarta-sans.css"/>
+<link rel="stylesheet" href="assets/vendor/fonts/fira-code.css"/>
+<link rel="stylesheet" href="assets/vendor/bootstrap-icons/bootstrap-icons.min.css"/>
+<link rel="stylesheet" href="assets/wj-shared.css"/>
+<script src="assets/vendor/xlsx/xlsx.bundle.js"></script>
+</head>
+<body>
+<div id="wj-nav-mount"></div>
+
+<div class="wj-page">
+  <div class="wj-page-hdr">
+    <div class="wj-eyebrow"><i class="bi bi-arrow-left-right"></i> Plan Enrollment Comparison Tool</div>
+    <h1 class="wj-page-title">Plan Enrollment Pre vs Post Comparison</h1>
+    <p class="wj-page-sub">Produces two full bidirectional reports — Pre→Post and Post→Pre — comparing Plan
+      Name, Coverage, Effective Date, and Enrollment Status by SSN. Same matching logic as the original tool.</p>
+  </div>
+
+  <div class="wj-card">
+    <div class="wj-card-hdr"><i class="bi bi-upload"></i> Upload Files</div>
+    <div class="wj-card-body">
+      <div class="wj-grid-2">
+        <div>
+          <label class="wj-field-lbl">Pre Excel File</label>
+          <div class="wj-drop" id="drop-pre">
+            <input type="file" id="file-pre" accept=".xlsx,.xls"/>
+            <i class="bi bi-file-earmark-spreadsheet"></i>
+            <div>Click or drop the pre file</div>
+            <div class="wj-drop-hint">header on row 5</div>
+            <div class="wj-drop-fname"></div>
+          </div>
+        </div>
+        <div>
+          <label class="wj-field-lbl">Post Excel File</label>
+          <div class="wj-drop" id="drop-post">
+            <input type="file" id="file-post" accept=".xlsx,.xls"/>
+            <i class="bi bi-file-earmark-spreadsheet"></i>
+            <div>Click or drop the post file</div>
+            <div class="wj-drop-hint">header on row 5</div>
+            <div class="wj-drop-fname"></div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:1rem;display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+        <button class="wj-btn wj-btn-primary" id="btn-run" disabled><i class="bi bi-play-fill"></i> Generate Output</button>
+        <button class="wj-btn wj-btn-grn wj-hidden" id="btn-download-1"><i class="bi bi-download"></i> Download Pre → Post</button>
+        <button class="wj-btn wj-btn-grn wj-hidden" id="btn-download-2"><i class="bi bi-download"></i> Download Post → Pre</button>
+      </div>
+      <div id="run-log" class="wj-log wj-hidden" style="margin-top:.9rem"></div>
+      <div id="preview-wrap" class="wj-hidden" style="margin-top:.9rem">
+        <div style="font-size:.75rem;font-weight:700;color:var(--wj-txt2);margin-bottom:.4rem">Preview — Pre → Post</div>
+        <div class="wj-table-wrap"><table class="wj-table" id="preview-table"></table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/wj-shared.js"></script>
+<script>
+wjRenderNav('comparison-tool.html');
+
+let preFile=null, postFile=null;
+let outResult=null; // {preToPost:{columns,rows}, postToPre:{columns,rows}}
+
+function log(msg,cls){
+  const el=document.getElementById('run-log');
+  el.classList.remove('wj-hidden');
+  const line=document.createElement('div');
+  line.className=cls||'info';
+  line.textContent=msg;
+  el.appendChild(line);
+  el.scrollTop=el.scrollHeight;
+}
+function clearLog(){ const el=document.getElementById('run-log'); el.innerHTML=''; el.classList.add('wj-hidden'); }
+
+wjWireDropzone('drop-pre','file-pre',f=>{ preFile=f; wjSetDropFilename('drop-pre',f.name); checkReady(); });
+wjWireDropzone('drop-post','file-post',f=>{ postFile=f; wjSetDropFilename('drop-post',f.name); checkReady(); });
+function checkReady(){ document.getElementById('btn-run').disabled=!(preFile&&postFile); }
+
+const STATUS_CANDIDATES=['Enrollment Status','Employment Status','Status'];
+function getStatusColumn(headers){
+  const lowSet=STATUS_CANDIDATES.map(s=>s.toLowerCase());
+  for(const h of headers){
+    if(lowSet.includes(h.trim().toLowerCase())) return h;
+  }
+  throw new Error('Status column not found');
+}
+function removeDuplicatesByEmployeeName(headers,rows){
+  if(!headers.includes('Employee Name')) return rows;
+  const seen=new Set();
+  return rows.filter(r=>{
+    const key=r['Employee Name'];
+    if(seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+const COMPARE_COLS=['Plan Name','Coverage','Effective Date','Enrollment Status'];
+
+/** Mirrors create_comparison_for_base() */
+function createComparisonForBase(baseHeaders,baseRows,lookupHeaders,lookupRows,lookupLabel){
+  let columnOrder=[...baseHeaders];
+  const workRows=baseRows.map(r=>({...r}));
+
+  // build lookup maps: ssn_norm -> value, per compare column
+  const lookupMaps={};
+  COMPARE_COLS.forEach(col=>{
+    const map=new Map();
+    if(lookupHeaders.includes(col)){
+      lookupRows.forEach(lr=>{
+        map.set(wjNormSSN(lr['Employee SSN']), lr[col]);
+      });
+    }
+    lookupMaps[col]=map;
+  });
+
+  COMPARE_COLS.forEach(col=>{
+    const colExistsInBase=baseHeaders.includes(col);
+    const insertIdx = columnOrder.includes(col) ? columnOrder.indexOf(col)+1 : columnOrder.length;
+
+    const postValues=[], compareResults=[];
+    workRows.forEach(row=>{
+      const ssnNorm=wjNormSSN(row['Employee SSN']);
+      const map=lookupMaps[col];
+      if(map.size>0 && map.has(ssnNorm)){
+        const lookupVal=map.get(ssnNorm);
+        const isNA = lookupVal===undefined || lookupVal===null || lookupVal==='';
+        postValues.push(isNA? 'Column Missing' : lookupVal);
+        const baseVal=colExistsInBase? row[col] : '';
+        compareResults.push(wjNormText(baseVal)===wjNormText(lookupVal));
+      } else {
+        postValues.push('New Employee');
+        compareResults.push('New Employee');
+      }
+    });
+
+    const postColName=`${col} (${lookupLabel})`;
+    const compareColName=`${col} Compare`;
+    workRows.forEach((r,i)=>{ r[postColName]=postValues[i]; r[compareColName]=compareResults[i]; });
+    columnOrder.splice(insertIdx,0,postColName,compareColName);
+  });
+
+  return {columns:columnOrder, rows:workRows};
+}
+
+function formatDatesInPlace(result){
+  const dateCols=['Effective Date','Effective Date (Post)','Effective Date (Pre)'];
+  dateCols.forEach(c=>{
+    if(result.columns.includes(c)){
+      result.rows.forEach(r=>{ r[c]=wjFormatDateMDYNoPad(r[c]); });
+    }
+  });
+}
+
+document.getElementById('btn-run').addEventListener('click',async ()=>{
+  clearLog();
+  document.getElementById('btn-download-1').classList.add('wj-hidden');
+  document.getElementById('btn-download-2').classList.add('wj-hidden');
+  document.getElementById('preview-wrap').classList.add('wj-hidden');
+  try{
+    log('Reading pre file...');
+    const preBuf=await wjReadFileAsArrayBuffer(preFile);
+    const preWb=XLSX.read(preBuf,{type:'array'});
+    let pre=wjSheetToObjects(preWb,0,4);
+
+    log('Reading post file...');
+    const postBuf=await wjReadFileAsArrayBuffer(postFile);
+    const postWb=XLSX.read(postBuf,{type:'array'});
+    let post=wjSheetToObjects(postWb,0,4);
+
+    pre.rows=removeDuplicatesByEmployeeName(pre.headers,pre.rows);
+    post.rows=removeDuplicatesByEmployeeName(post.headers,post.rows);
+
+    if(!pre.headers.includes('Employee SSN') || !post.headers.includes('Employee SSN')){
+      throw new Error('Employee SSN column must exist in both files for matching');
+    }
+    pre.rows=pre.rows.map(r=>({...r, ssn_norm: wjNormSSN(r['Employee SSN'])}));
+    post.rows=post.rows.map(r=>({...r, ssn_norm: wjNormSSN(r['Employee SSN'])}));
+    const preHeadersWithNorm=[...pre.headers,'ssn_norm'];
+    const postHeadersWithNorm=[...post.headers,'ssn_norm'];
+
+    const statusPre=getStatusColumn(pre.headers);
+    const statusPost=getStatusColumn(post.headers);
+
+    let preActive, postActive;
+    if(statusPre.trim().toLowerCase()==='employment status'){
+      preActive=pre.rows.filter(r=>String(r[statusPre]==null?'':r[statusPre]).trim().toLowerCase()==='active');
+      postActive=post.rows.filter(r=>String(r[statusPost]==null?'':r[statusPost]).trim().toLowerCase()==='active');
+      log('Status column is "Employment Status" — filtering to active records only.');
+    } else {
+      preActive=[...pre.rows];
+      postActive=[...post.rows];
+      log(`Status column is "${statusPre}" — no active-only filter applied (matches original tool behavior).`,'warn');
+    }
+
+    log(`${preActive.length} pre record(s) · ${postActive.length} post record(s) after dedupe/filter.`);
+
+    const preToPost=createComparisonForBase(preHeadersWithNorm,preActive,postHeadersWithNorm,postActive,'Post');
+    const postToPre=createComparisonForBase(postHeadersWithNorm,postActive,preHeadersWithNorm,preActive,'Pre');
+
+    formatDatesInPlace(preToPost);
+    formatDatesInPlace(postToPre);
+
+    outResult={preToPost,postToPre,preName:preFile.name,postName:postFile.name};
+
+    log(`✓ Comparison complete — Pre→Post: ${preToPost.rows.length} rows · Post→Pre: ${postToPre.rows.length} rows.`,'ok');
+
+    renderPreview(preToPost);
+    document.getElementById('btn-download-1').classList.remove('wj-hidden');
+    document.getElementById('btn-download-2').classList.remove('wj-hidden');
+
+  }catch(err){
+    log('Error: '+err.message,'err');
+  }
+});
+
+function renderPreview(result){
+  const wrap=document.getElementById('preview-wrap');
+  const table=document.getElementById('preview-table');
+  wrap.classList.remove('wj-hidden');
+  const cols=result.columns;
+  let html='<thead><tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>';
+  result.rows.slice(0,50).forEach(r=>{
+    html+='<tr>'+cols.map(c=>`<td>${r[c]===undefined||r[c]===null?'':r[c]}</td>`).join('')+'</tr>';
+  });
+  html+='</tbody>';
+  table.innerHTML=html;
+  if(result.rows.length>50) log(`Preview limited to first 50 of ${result.rows.length} rows — full data is in the exported file.`,'warn');
+}
+
+function highlightColsFor(columns){
+  return columns.filter(c=>c.endsWith('(Post)')||c.endsWith('(Pre)')||c.includes('Compare'));
+}
+
+document.getElementById('btn-download-1').addEventListener('click',()=>{
+  if(!outResult) return;
+  const {preToPost}=outResult;
+  const ws=wjBuildSheetAOA(preToPost.columns,preToPost.rows,highlightColsFor(preToPost.columns));
+  const preStem=(outResult.preName||'Pre').replace(/\.(xlsx|xls)$/i,'');
+  const postStem=(outResult.postName||'Post').replace(/\.(xlsx|xls)$/i,'');
+  const fname=`${preStem}_vs_${postStem}_${wjTimestamp()}_PRE_TO_POST.xlsx`;
+  wjDownloadWorkbook(ws,'Sheet1',fname);
+  wjToast('✓ Pre → Post report downloaded');
+});
+document.getElementById('btn-download-2').addEventListener('click',()=>{
+  if(!outResult) return;
+  const {postToPre}=outResult;
+  const ws=wjBuildSheetAOA(postToPre.columns,postToPre.rows,highlightColsFor(postToPre.columns));
+  const preStem=(outResult.preName||'Pre').replace(/\.(xlsx|xls)$/i,'');
+  const postStem=(outResult.postName||'Post').replace(/\.(xlsx|xls)$/i,'');
+  const fname=`${postStem}_vs_${preStem}_${wjTimestamp()}_POST_TO_PRE.xlsx`;
+  wjDownloadWorkbook(ws,'Sheet1',fname);
+  wjToast('✓ Post → Pre report downloaded');
+});
+</script>
+</body>
+</html>
