@@ -1,0 +1,6 @@
+requirements.txt
+desktop/
+desktop-automation/
+Auto code/
+*.bat
+*.py
