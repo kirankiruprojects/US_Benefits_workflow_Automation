@@ -7,3 +7,4 @@ python-docx>=1.0.0
 screeninfo>=0.8.0
 keyboard>=0.13.5
 pywin32>=306
+language-tool-python>=3.4.0
