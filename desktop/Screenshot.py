@@ -43,9 +43,22 @@ excluded so it doesn't spam captures while you're writing a note, and
 the "Pause Hotkey" button lets you disable it entirely while you work.
 
 Requirements (install once):
-    pip install pillow python-docx screeninfo keyboard pywin32
+    pip install pillow python-docx screeninfo keyboard pywin32 language-tool-python
 
 Notes:
+    - Spelling/grammar check: the "Check Spelling/Grammar" button under the
+      Issue and Note boxes uses language_tool_python, which needs a Java
+      runtime installed on this machine. The first check in a session takes
+      longer while it starts a local LanguageTool server; after that it's
+      fast. If Java or the package isn't available, the button just shows a
+      short message instead of failing - everything else keeps working.
+    - Every page gets a brand-blue border (set once via set_page_border()
+      right after the document is created), since a single section covers
+      the whole report.
+    - Dates are shown/entered as MM/DD/YYYY throughout (cover page fields
+      and the Started/Ended timestamps, which also use a 12-hour AM/PM
+      clock). The autosave filename still uses YYYYMMDD_HHMM internally
+      since "/" isn't allowed in filenames.
     - Multi-monitor capture uses screeninfo to find which monitor the
       mouse cursor is on, then grabs just that monitor. Cursor position
       is read via the Windows GetCursorPos API, so this capture logic
@@ -87,9 +100,16 @@ from PIL import ImageGrab
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_ROW_HEIGHT_RULE, WD_ALIGN_VERTICAL
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from screeninfo import get_monitors
+
+try:
+    import language_tool_python
+    _GRAMMAR_AVAILABLE = True
+except ImportError:
+    _GRAMMAR_AVAILABLE = False
 
 ISSUE_COLOR = RGBColor(0xC0, 0x00, 0x00)     # red
 NOTE_COLOR = RGBColor(0x00, 0x64, 0x00)      # dark green
@@ -203,12 +223,112 @@ def add_bookmark(paragraph, bookmark_name, bookmark_id):
     paragraph._p.append(end)
 
 
+# ---------- internal hyperlink helpers (click an issue -> jump to it) ----------
+
+def _hyperlink_rpr(color=None, bold=False, underline=True):
+    rpr = OxmlElement("w:rPr")
+    if bold:
+        rpr.append(OxmlElement("w:b"))
+    if underline:
+        u = OxmlElement("w:u")
+        u.set(qn("w:val"), "single")
+        rpr.append(u)
+    if color:
+        c = OxmlElement("w:color")
+        c.set(qn("w:val"), color.lstrip("#"))
+        rpr.append(c)
+    return rpr
+
+
+def _text_run_el(text, color=None, bold=False, underline=True):
+    """A plain <w:r> text run, built as a raw element (for use inside a hyperlink)."""
+    run = OxmlElement("w:r")
+    run.append(_hyperlink_rpr(color, bold, underline))
+    t = OxmlElement("w:t")
+    t.set(qn("xml:space"), "preserve")
+    t.text = text
+    run.append(t)
+    return run
+
+
+def _field_run_el(instr_text, placeholder="1", color=None, bold=False, underline=True):
+    """A live-field <w:r> run (PAGEREF etc.), built as a raw element (for use inside a hyperlink)."""
+    run = OxmlElement("w:r")
+    run.append(_hyperlink_rpr(color, bold, underline))
+
+    fld_begin = OxmlElement("w:fldChar")
+    fld_begin.set(qn("w:fldCharType"), "begin")
+    instr = OxmlElement("w:instrText")
+    instr.set(qn("xml:space"), "preserve")
+    instr.text = instr_text
+    fld_sep = OxmlElement("w:fldChar")
+    fld_sep.set(qn("w:fldCharType"), "separate")
+    cached = OxmlElement("w:t")
+    cached.text = placeholder
+    fld_end = OxmlElement("w:fldChar")
+    fld_end.set(qn("w:fldCharType"), "end")
+
+    run.append(fld_begin)
+    run.append(instr)
+    run.append(fld_sep)
+    run.append(cached)
+    run.append(fld_end)
+    return run
+
+
+def add_issue_summary_hyperlink(paragraph, bookmark_name, issue_text, color):
+    """Build the whole 'Page N: issue text' summary entry as ONE clickable
+    hyperlink (the page number stays a live PAGEREF field) that jumps
+    straight to that issue's bookmark in the body of the document."""
+    hyperlink = OxmlElement("w:hyperlink")
+    hyperlink.set(qn("w:anchor"), bookmark_name)
+    hyperlink.set(qn("w:history"), "1")
+    hyperlink.append(_text_run_el("Page ", color=color))
+    hyperlink.append(_field_run_el(f"PAGEREF {bookmark_name} \\h", color=color))
+    hyperlink.append(_text_run_el(f": {issue_text}", color=color))
+    paragraph._p.append(hyperlink)
+    return hyperlink
+
+
+def add_next_issue_arrow(paragraph_p, target_bookmark, color, text=" \u25B8 Next Issue"):
+    """Append a small clickable 'Next Issue' link to the END of an issue
+    paragraph already in the document, jumping forward to the bookmark of
+    the issue captured right after it."""
+    hyperlink = OxmlElement("w:hyperlink")
+    hyperlink.set(qn("w:anchor"), target_bookmark)
+    hyperlink.set(qn("w:history"), "1")
+    hyperlink.append(_text_run_el(text, color=color, bold=True))
+    paragraph_p.append(hyperlink)
+    return hyperlink
+
+
 def set_update_fields_on_open(document):
     """Flag the doc so Word recalculates fields (PAGE/PAGEREF) as soon as it opens."""
     settings = document.settings.element
     update_fields = OxmlElement("w:updateFields")
     update_fields.set(qn("w:val"), "true")
     settings.append(update_fields)
+
+
+def set_page_border(document, color="1F4E79", sz=18, space=24, val="single"):
+    """Add a border around every page of the document. Applies to every
+    section, so it covers the whole doc even if more sections get added."""
+    for section in document.sections:
+        sect_pr = section._sectPr
+        pg_borders = sect_pr.find(qn("w:pgBorders"))
+        if pg_borders is None:
+            pg_borders = OxmlElement("w:pgBorders")
+            sect_pr.append(pg_borders)
+        pg_borders.set(qn("w:offsetFrom"), "page")
+        for edge in ("top", "left", "bottom", "right"):
+            element = pg_borders.find(qn(f"w:{edge}"))
+            if element is None:
+                element = OxmlElement(f"w:{edge}")
+                pg_borders.append(element)
+            element.set(qn("w:val"), val)
+            element.set(qn("w:sz"), str(sz))
+            element.set(qn("w:space"), str(space))
+            element.set(qn("w:color"), color)
 
 
 def refresh_fields_via_word(path):
@@ -237,6 +357,31 @@ def refresh_fields_via_word(path):
             doc.Close(False)
     finally:
         word.Quit()
+
+
+def set_cell_border(cell, **edges):
+    """Set specific border edges on a cell, e.g.
+    set_cell_border(cell, top={"sz": 18, "val": "single", "color": "70AD47"})"""
+    tc_pr = cell._tc.get_or_add_tcPr()
+    tc_borders = tc_pr.find(qn("w:tcBorders"))
+    if tc_borders is None:
+        tc_borders = OxmlElement("w:tcBorders")
+        tc_pr.append(tc_borders)
+    for edge_name, edge_opts in edges.items():
+        tag = f"w:{edge_name}"
+        element = tc_borders.find(qn(tag))
+        if element is None:
+            element = OxmlElement(tag)
+            tc_borders.append(element)
+        for key, val in edge_opts.items():
+            element.set(qn(f"w:{key}"), str(val))
+
+
+# ---- cover table look (clean white card, blue values, green accent rules) ----
+COVER_LABEL_FG = RGBColor(0x00, 0x00, 0x00)   # black, bold labels
+COVER_VALUE_FG = RGBColor(0x1F, 0x6F, 0xC1)   # medium blue values
+COVER_ACCENT_HEX = "70AD47"                    # green top/bottom accent rule
+COVER_ROW_HEIGHT = Inches(0.6)                 # tall rows so the table reads as half the page
 
 
 def add_cover_page(document, client_name, team_member, team_name, date_of_testing, purpose):
@@ -275,19 +420,49 @@ def add_cover_page(document, client_name, team_member, team_name, date_of_testin
 
     table = document.add_table(rows=0, cols=2)
     table.style = "Table Grid"
+    table.autofit = False
 
     cover_cells = {}
-    for label in COVER_FIELDS:
-        row = table.add_row().cells
-        row[0].width = Inches(2.1)
-        row[1].width = Inches(4.1)
+    last_row_index = len(COVER_FIELDS) - 1
+    for i, label in enumerate(COVER_FIELDS):
+        table_row = table.add_row()
+        table_row.height = COVER_ROW_HEIGHT
+        table_row.height_rule = WD_ROW_HEIGHT_RULE.AT_LEAST
+        row = table_row.cells
+        row[0].width = Inches(2.3)
+        row[1].width = Inches(4.4)
+
         row[0].text = label
-        row[0].paragraphs[0].runs[0].bold = True
+        label_run = row[0].paragraphs[0].runs[0]
+        label_run.bold = True
+        label_run.font.size = Pt(11)
+        label_run.font.color.rgb = COVER_LABEL_FG
+
         row[1].text = values[label]
+        if row[1].paragraphs[0].runs:
+            value_run = row[1].paragraphs[0].runs[0]
+            value_run.font.size = Pt(11)
+            value_run.font.color.rgb = COVER_VALUE_FG
+
+        for cell in row:
+            cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+            if i == 0:
+                set_cell_border(cell, top={"sz": 18, "val": "single", "color": COVER_ACCENT_HEX})
+            if i == last_row_index:
+                set_cell_border(cell, bottom={"sz": 18, "val": "single", "color": COVER_ACCENT_HEX})
+
         cover_cells[label] = row[1]
 
     document.add_page_break()
     return cover_cells
+
+
+def _style_value_cell(cell):
+    """Re-apply the cover table's value styling (blue, 11pt) to every run
+    in a cell - needed after cell.text = ... replaces the runs."""
+    for run in cell.paragraphs[0].runs:
+        run.font.size = Pt(11)
+        run.font.color.rgb = COVER_VALUE_FG
 
 
 def fill_cover_summary(cover_cells, total_issues, bookmark_names,
@@ -301,30 +476,34 @@ def fill_cover_summary(cover_cells, total_issues, bookmark_names,
     count_cell = cover_cells.get("Total Issues Identified")
     if count_cell is not None:
         count_cell.text = str(total_issues)
+        _style_value_cell(count_cell)
 
     pages_cell = cover_cells.get("Issues Log (Page No.)")
     if pages_cell is not None:
         pages_cell.text = ""
         p = pages_cell.paragraphs[0]
         if not bookmark_names:
-            p.add_run("None")
+            p.add_run("None").font.color.rgb = COVER_VALUE_FG
         else:
             for i, name in enumerate(bookmark_names):
                 if i > 0:
-                    p.add_run(", ")
-                add_field(p, f"PAGEREF {name} \\h")
+                    p.add_run(", ").font.color.rgb = COVER_VALUE_FG
+                add_field(p, f"PAGEREF {name} \\h", color=COVER_VALUE_FG)
 
     pending_cell = cover_cells.get("Total Issues Pending")
     if pending_cell is not None:
         pending_cell.text = pending
+        _style_value_cell(pending_cell)
 
     resolved_cell = cover_cells.get("Total Issues Resolved")
     if resolved_cell is not None:
         resolved_cell.text = resolved
+        _style_value_cell(resolved_cell)
 
     date_resolved_cell = cover_cells.get("Date of Issues Resolved")
     if date_resolved_cell is not None:
         date_resolved_cell.text = date_resolved
+        _style_value_cell(date_resolved_cell)
 
 
 class EndSessionDialog(tk.Toplevel):
@@ -375,7 +554,7 @@ class EndSessionDialog(tk.Toplevel):
 
         first_entry = add_entry("Total Issues Pending", "pending")
         add_entry("Total Issues Resolved", "resolved")
-        add_entry("Date of Issues Resolved", "date_resolved", default=datetime.now().strftime("%Y-%m-%d"))
+        add_entry("Date of Issues Resolved", "date_resolved", default=datetime.now().strftime("%m/%d/%Y"))
 
         btn_row = tk.Frame(body, bg=UI_PANEL_BG)
         btn_row.pack(fill="x", padx=14, pady=12)
@@ -457,7 +636,7 @@ class StartSessionDialog(tk.Toplevel):
         add_entry("Client Name", "client_name")
         add_entry("Team Member", "team_member")
         add_entry("Team / Department", "team_name", default="Systems Configuration Team")
-        add_entry("Date of Testing", "date_of_testing", default=datetime.now().strftime("%Y-%m-%d"))
+        add_entry("Date of Testing", "date_of_testing", default=datetime.now().strftime("%m/%d/%Y"))
 
         tk.Label(
             body, text="Purpose of Review", bg=UI_PANEL_BG, fg=UI_TEXT,
@@ -544,15 +723,28 @@ class WorkflowCaptureTool:
         self.last_summary_element = None
         self.cover_cells = {}
 
+        # "Next Issue" chain - the most recently captured issue's bookmark
+        # and paragraph, so the NEXT issue captured can append a forward
+        # arrow onto it
+        self.last_issue_bookmark_name = None
+        self.last_issue_paragraph_p = None
+
         # undo tracking - the elements added by the most recent capture_step()
         self.last_step_elements = []          # body-level <w:p> elements from the last step
         self.last_step_had_issue = False
         self.last_step_summary_element = None  # the mirrored Issues Summary <w:p>, if any
+        self.last_step_prev_issue_bookmark = None   # "Next Issue" chain state to restore on undo
+        self.last_step_prev_issue_paragraph_p = None
+        self.last_step_arrow_element = None         # the arrow hyperlink this step added, if any
 
         # hotkey / focus tracking
         self.capture_in_progress = False
         self.typing_active = False
         self.hotkey_enabled = True
+
+        # spelling/grammar checker - created lazily on first use since it's
+        # slow to start; False means "tried and failed, don't retry"
+        self._grammar_tool = None
 
         self._build_ui()
         self._position_top_right()
@@ -650,22 +842,40 @@ class WorkflowCaptureTool:
         self.issue_text.bind("<FocusIn>", self._on_note_focus_in)
         self.issue_text.bind("<FocusOut>", self._on_note_focus_out)
 
+        def make_check_button(parent, command):
+            return tk.Button(
+                parent, text="\u2713 Check Spelling/Grammar", command=command,
+                bg="#EEF2F7", fg=UI_ACCENT, activebackground="#DCE6F1",
+                activeforeground=UI_ACCENT, relief="flat",
+                font=(FONT_FAMILY, 8, "bold"), padx=8, pady=3, bd=0,
+            )
+
+        self.issue_check_btn = make_check_button(
+            panel, lambda: self._check_and_fix_text(self.issue_text, "Issue")
+        )
+        self.issue_check_btn.grid(row=7, column=0, columnspan=3, sticky="w", padx=12, pady=(4, 0))
+
         ttk.Label(panel, text="Note", style="Panel.TLabel", background=UI_PANEL_BG,
                   font=(FONT_FAMILY, 9, "bold"), foreground=NOTE_COLOR_HEX).grid(
-            row=7, column=0, columnspan=3, sticky="w", **pad
+            row=8, column=0, columnspan=3, sticky="w", **pad
         )
         self.note_text = tk.Text(
             panel, height=2, width=42, wrap="word", fg=NOTE_COLOR_HEX,
             font=(FONT_FAMILY, 10), relief="solid", bd=1, highlightthickness=0,
         )
-        self.note_text.grid(row=8, column=0, columnspan=3, padx=12, pady=(4, 0), sticky="ew")
+        self.note_text.grid(row=9, column=0, columnspan=3, padx=12, pady=(4, 0), sticky="ew")
         self.note_text.bind("<FocusIn>", self._on_note_focus_in)
         self.note_text.bind("<FocusOut>", self._on_note_focus_out)
+
+        self.note_check_btn = make_check_button(
+            panel, lambda: self._check_and_fix_text(self.note_text, "Note")
+        )
+        self.note_check_btn.grid(row=10, column=0, columnspan=3, sticky="w", padx=12, pady=(4, 0))
 
         self.count_var = tk.StringVar(value="")
         ttk.Label(panel, textvariable=self.count_var, style="Panel.TLabel",
                   background=UI_PANEL_BG, foreground=UI_MUTED).grid(
-            row=9, column=0, columnspan=3, sticky="w", padx=12, pady=(10, 0)
+            row=11, column=0, columnspan=3, sticky="w", padx=12, pady=(10, 0)
         )
 
         hint = ttk.Label(
@@ -673,7 +883,7 @@ class WorkflowCaptureTool:
             text='Tip: once running, press K anywhere to capture too.',
             style="Muted.TLabel", background=UI_PANEL_BG,
         )
-        hint.grid(row=10, column=0, columnspan=3, sticky="w", padx=12, pady=(2, 12))
+        hint.grid(row=12, column=0, columnspan=3, sticky="w", padx=12, pady=(2, 12))
 
     def _set_btn_enabled(self, btn, enabled):
         enabled_color, disabled_color = self._btn_colors[btn]
@@ -708,6 +918,59 @@ class WorkflowCaptureTool:
         keyboard.unhook_all()
         self.root.destroy()
 
+    # ---------- spelling / grammar check ----------
+
+    def _get_grammar_tool(self):
+        """Lazily start the LanguageTool checker (spelling + sentence/grammar).
+        Returns None if the package or a Java runtime isn't available."""
+        if not _GRAMMAR_AVAILABLE:
+            return None
+        if self._grammar_tool is False:
+            return None
+        if self._grammar_tool is None:
+            try:
+                self._grammar_tool = language_tool_python.LanguageTool("en-US")
+            except Exception:
+                self._grammar_tool = False
+                return None
+        return self._grammar_tool
+
+    def _check_and_fix_text(self, text_widget, label):
+        """Check the given Issue/Note box for spelling and sentence errors
+        and, if the user agrees, replace its text with the corrected version."""
+        text = text_widget.get("1.0", "end").strip()
+        if not text:
+            return
+
+        tool = self._get_grammar_tool()
+        if tool is None:
+            messagebox.showinfo(
+                "Spelling & Grammar",
+                "Spelling/grammar checking isn't available on this machine.\n\n"
+                "Install it with:\n    pip install language-tool-python\n\n"
+                "It also needs a Java runtime installed.",
+            )
+            return
+
+        try:
+            matches = tool.check(text)
+            corrected = language_tool_python.utils.correct(text, matches)
+        except Exception as exc:
+            messagebox.showwarning("Spelling & Grammar", f"Couldn't check the {label} text right now:\n{exc}")
+            return
+
+        if not matches or corrected.strip() == text:
+            messagebox.showinfo("Spelling & Grammar", f"No issues found in {label}.")
+            return
+
+        if messagebox.askyesno(
+            "Spelling & Grammar",
+            f"Found {len(matches)} possible issue(s) in {label}.\n\n"
+            f"Suggested:\n\"{corrected}\"\n\nApply this correction?",
+        ):
+            text_widget.delete("1.0", "end")
+            text_widget.insert("1.0", corrected)
+
     # ---------- Actions ----------
 
     def start_session(self):
@@ -732,12 +995,18 @@ class WorkflowCaptureTool:
         self.step_count = 0
         self.bookmark_counter = 0
         self.bookmark_names = []
+        self.last_issue_bookmark_name = None
+        self.last_issue_paragraph_p = None
         self.last_step_elements = []
         self.last_step_had_issue = False
         self.last_step_summary_element = None
+        self.last_step_prev_issue_bookmark = None
+        self.last_step_prev_issue_paragraph_p = None
+        self.last_step_arrow_element = None
 
         self.doc = Document()
         set_update_fields_on_open(self.doc)
+        set_page_border(self.doc)
 
         self.cover_cells = add_cover_page(
             self.doc,
@@ -750,7 +1019,7 @@ class WorkflowCaptureTool:
 
         self.doc.add_heading(f"Workflow Test: {self.workflow_name}", level=1)
         meta = self.doc.add_paragraph()
-        meta.add_run(f"Started: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}").italic = True
+        meta.add_run(f"Started: {self.start_time.strftime('%m/%d/%Y %I:%M:%S %p')}").italic = True
 
         summary_heading = self.doc.add_paragraph()
         heading_run = summary_heading.add_run("Issues Summary (page numbers)")
@@ -793,11 +1062,19 @@ class WorkflowCaptureTool:
             step_elements = []
             step_had_issue = False
             step_summary_element = None
+            step_prev_issue_bookmark = None
+            step_prev_issue_paragraph_p = None
+            step_arrow_element = None
 
             if issue:
                 self.bookmark_counter += 1
                 bookmark_name = f"issue_{self.bookmark_counter}"
                 self.bookmark_names.append(bookmark_name)
+
+                # remember the chain state as it was BEFORE this issue, so
+                # undo can put it back exactly
+                step_prev_issue_bookmark = self.last_issue_bookmark_name
+                step_prev_issue_paragraph_p = self.last_issue_paragraph_p
 
                 # inline, at the actual location, tagged with its own page
                 issue_para = self.doc.add_paragraph()
@@ -812,19 +1089,29 @@ class WorkflowCaptureTool:
                 trail.bold = True
                 trail.font.color.rgb = ISSUE_COLOR
 
-                # mirrored into the Issues Summary block at the top
+                # chain the PREVIOUS issue forward to this one with a
+                # clickable "Next Issue" arrow at the end of its line
+                if step_prev_issue_paragraph_p is not None:
+                    step_arrow_element = add_next_issue_arrow(
+                        step_prev_issue_paragraph_p, bookmark_name, color=ISSUE_COLOR_HEX
+                    )
+
+                # mirrored into the Issues Summary block at the top - the
+                # whole entry is a clickable link straight to the issue
                 summary_para = self.doc.add_paragraph()
                 self.last_summary_element.addnext(summary_para._p)
                 self.last_summary_element = summary_para._p
 
-                bullet = summary_para.add_run("\u2022 Page ")
+                bullet = summary_para.add_run("\u2022 ")
                 bullet.font.color.rgb = ISSUE_COLOR
-                add_field(summary_para, f"PAGEREF {bookmark_name} \\h", color=ISSUE_COLOR)
-                tail = summary_para.add_run(f": {issue}")
-                tail.font.color.rgb = ISSUE_COLOR
+                add_issue_summary_hyperlink(summary_para, bookmark_name, issue, color=ISSUE_COLOR_HEX)
 
                 step_had_issue = True
                 step_summary_element = summary_para._p
+
+                # this issue is now the head of the "Next Issue" chain
+                self.last_issue_bookmark_name = bookmark_name
+                self.last_issue_paragraph_p = issue_para._p
 
             if note:
                 note_para = self.doc.add_paragraph()
@@ -851,6 +1138,9 @@ class WorkflowCaptureTool:
             self.last_step_elements = step_elements
             self.last_step_had_issue = step_had_issue
             self.last_step_summary_element = step_summary_element
+            self.last_step_prev_issue_bookmark = step_prev_issue_bookmark
+            self.last_step_prev_issue_paragraph_p = step_prev_issue_paragraph_p
+            self.last_step_arrow_element = step_arrow_element
 
             self.issue_text.delete("1.0", "end")
             self.note_text.delete("1.0", "end")
@@ -902,6 +1192,15 @@ class WorkflowCaptureTool:
                                 self.last_summary_element = p._p
                                 break
 
+            # undo the "Next Issue" arrow this issue chained onto the
+            # previous issue, and roll the chain pointer back to it
+            if self.last_step_arrow_element is not None:
+                arrow_parent = self.last_step_arrow_element.getparent()
+                if arrow_parent is not None:
+                    arrow_parent.remove(self.last_step_arrow_element)
+            self.last_issue_bookmark_name = self.last_step_prev_issue_bookmark
+            self.last_issue_paragraph_p = self.last_step_prev_issue_paragraph_p
+
         self.step_count -= 1
         self.count_var.set(f"{self.step_count} step(s) captured")
 
@@ -909,6 +1208,9 @@ class WorkflowCaptureTool:
         self.last_step_elements = []
         self.last_step_had_issue = False
         self.last_step_summary_element = None
+        self.last_step_prev_issue_bookmark = None
+        self.last_step_prev_issue_paragraph_p = None
+        self.last_step_arrow_element = None
         self._set_btn_enabled(self.undo_btn, False)
 
         try:
@@ -929,7 +1231,7 @@ class WorkflowCaptureTool:
 
         self.doc.add_heading("Test Completed", level=2)
         summary = self.doc.add_paragraph()
-        summary.add_run(f"Ended: {end_time.strftime('%Y-%m-%d %H:%M:%S')}\n").italic = True
+        summary.add_run(f"Ended: {end_time.strftime('%m/%d/%Y %I:%M:%S %p')}\n").italic = True
         summary.add_run(f"Duration: {str(duration).split('.')[0]}\n").italic = True
         summary.add_run(f"Total steps captured: {self.step_count}").italic = True
 
@@ -971,9 +1273,14 @@ class WorkflowCaptureTool:
         self.doc = None
         self.save_path = None
         self.cover_cells = {}
+        self.last_issue_bookmark_name = None
+        self.last_issue_paragraph_p = None
         self.last_step_elements = []
         self.last_step_had_issue = False
         self.last_step_summary_element = None
+        self.last_step_prev_issue_bookmark = None
+        self.last_step_prev_issue_paragraph_p = None
+        self.last_step_arrow_element = None
         self.status_var.set("Not started")
         self.count_var.set("")
         self.issue_text.delete("1.0", "end")
