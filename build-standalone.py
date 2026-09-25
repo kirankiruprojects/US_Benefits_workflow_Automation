@@ -174,6 +174,8 @@ def build_application() -> None:
         "--collect-all=screeninfo",
         "--collect-all=keyboard",
         "--collect-all=PIL",
+        "--collect-all=language_tool_python",
+        "--hidden-import=language_tool_python",
         "--noconfirm",
         os.path.join(desktop_dir, "main.py"),
     ]
