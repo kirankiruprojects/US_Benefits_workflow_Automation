@@ -89,8 +89,11 @@ Run:
 """
 
 import io
+import json
 import ctypes
 import time
+import urllib.parse
+import urllib.request
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from datetime import datetime
@@ -935,6 +938,31 @@ class WorkflowCaptureTool:
                 return None
         return self._grammar_tool
 
+    def _check_via_api(self, text):
+        """Check spelling & grammar using the LanguageTool public API (no Java or local server required)."""
+        data = urllib.parse.urlencode({"text": text, "language": "en-US"}).encode("utf-8")
+        req = urllib.request.Request(
+            "https://api.languagetool.org/v2/check",
+            data=data,
+            headers={"User-Agent": "WorkflowCaptureTool/1.0"},
+        )
+        with urllib.request.urlopen(req, timeout=6.0) as res:
+            res_data = json.loads(res.read().decode("utf-8"))
+        matches = res_data.get("matches", [])
+        corrected = text
+        matches_sorted = sorted(matches, key=lambda m: m.get("offset", 0), reverse=True)
+        count = 0
+        for m in matches_sorted:
+            repls = m.get("replacements", [])
+            if repls:
+                offset = m.get("offset", 0)
+                length = m.get("length", 0)
+                best_repl = repls[0].get("value", "")
+                if best_repl:
+                    corrected = corrected[:offset] + best_repl + corrected[offset + length:]
+                    count += 1
+        return count, corrected
+
     def _check_and_fix_text(self, text_widget, label):
         """Check the given Issue/Note box for spelling and sentence errors
         and, if the user agrees, replace its text with the corrected version."""
@@ -943,29 +971,34 @@ class WorkflowCaptureTool:
             return
 
         tool = self._get_grammar_tool()
+        matches_count = 0
+        corrected = text
+
+        if tool is not None:
+            try:
+                matches = tool.check(text)
+                corrected = language_tool_python.utils.correct(text, matches)
+                matches_count = len(matches)
+            except Exception:
+                tool = None
+
         if tool is None:
-            messagebox.showinfo(
-                "Spelling & Grammar",
-                "Spelling/grammar checking isn't available on this machine.\n\n"
-                "Install it with:\n    pip install language-tool-python\n\n"
-                "It also needs a Java runtime installed.",
-            )
-            return
+            try:
+                matches_count, corrected = self._check_via_api(text)
+            except Exception as exc:
+                messagebox.showwarning(
+                    "Spelling & Grammar",
+                    f"Couldn't check the {label} text right now (check internet connection):\n{exc}",
+                )
+                return
 
-        try:
-            matches = tool.check(text)
-            corrected = language_tool_python.utils.correct(text, matches)
-        except Exception as exc:
-            messagebox.showwarning("Spelling & Grammar", f"Couldn't check the {label} text right now:\n{exc}")
-            return
-
-        if not matches or corrected.strip() == text:
+        if matches_count == 0 or corrected.strip() == text:
             messagebox.showinfo("Spelling & Grammar", f"No issues found in {label}.")
             return
 
         if messagebox.askyesno(
             "Spelling & Grammar",
-            f"Found {len(matches)} possible issue(s) in {label}.\n\n"
+            f"Found {matches_count} possible issue(s) in {label}.\n\n"
             f"Suggested:\n\"{corrected}\"\n\nApply this correction?",
         ):
             text_widget.delete("1.0", "end")
