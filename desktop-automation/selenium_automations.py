@@ -698,11 +698,35 @@ def run_new_client_auto_login(excel_path: str, portal_url: str, ui: "UI") -> Non
 def run_new_client_password_setup(excel_path: str, portal_url: str, password: str, ui: "UI") -> None:
     """
     Sets up initial passwords for employee records from UserID and Date Of Birth.
+    Flow matches the tested reference automation:
+      1. Login with UserID + temp password (DOB MMDDYYYY)
+      2. Fill New Password & Confirm Password
+      3. Set Security Q1 ('What was the make of your first car?' -> 'Audi')
+      4. Set Security Q2 ('In which town was your first job?' -> 'Hgsi')
+      5. Click Submit
+      6. Wait for success confirmation and click 'Ok'
+      7. Verify return to login page
     """
-    rows = _read_excel_rows(excel_path, ["UserID", "Date Of Birth"])
-    total = len(rows)
+    # Load Excel — UserID / Username + Date Of Birth / DOB
+    df = pd.read_excel(excel_path)
+    df.columns = [str(c).strip() for c in df.columns]
+    cmap = {c.lower(): c for c in df.columns}
+
+    uid_col = cmap.get("userid") or cmap.get("username")
+    dob_col = next((cmap[k] for k in cmap if "date of birth" in k or k == "dob"), None)
+
+    if not uid_col or not dob_col:
+        raise ValueError(
+            f"Excel must contain 'UserID' and 'Date Of Birth' columns.\nFound columns: {list(df.columns)}"
+        )
+
+    records = df[[uid_col, dob_col]].dropna().rename(
+        columns={uid_col: "UserID", dob_col: "DOB"}
+    ).to_dict("records")
+
+    total = len(records)
     ui.log("=" * 65)
-    ui.log(f"Starting Password Setup: {total} record(s) | {time.strftime('%H:%M:%S')}")
+    ui.log(f"Starting password setup for {total} record(s) | {time.strftime('%H:%M:%S')}")
     ui.log("=" * 65)
 
     driver = _create_chrome_driver()
@@ -711,30 +735,31 @@ def run_new_client_password_setup(excel_path: str, portal_url: str, password: st
     try:
         wait = WebDriverWait(driver, 15)
 
-        for i, row in enumerate(rows, 1):
-            user = str(row.get("UserID", "")).strip()
-            dob_raw = str(row.get("Date Of Birth", "")).strip()
-            lbl = f"[{i:02d}/{total}] {user}"
+        for i, row in enumerate(records, 1):
+            user_id = str(row["UserID"]).strip()
+            lbl = f"[{i:02d}/{total}] {user_id}"
 
-            # Format DOB as temp password
-            # Strip all non-digit chars (handles dates like "1990-05-14", "1990/05/14", timestamps)
-            dob_clean = re.sub(r"[^\d]", "", dob_raw)
-            if len(dob_clean) == 14:  # Timestamp: YYYYMMDDHHMMSS -> use first 8 digits
-                dob_clean = dob_clean[:8]
-            if len(dob_clean) == 8:
-                # If YYYYMMDD, reformat to MMDDYYYY
-                if dob_clean[:4].startswith(("19", "20")):  # year first
-                    temp_pwd = dob_clean[4:6] + dob_clean[6:8] + dob_clean[:4]  # MMDDYYYY
+            # Convert DOB -> temp password MMDDYYYY
+            try:
+                dob = pd.to_datetime(row["DOB"])
+                temp_pw = dob.strftime("%m%d%Y")  # e.g. 09281978
+            except Exception:
+                dob_raw = str(row["DOB"]).strip()
+                dob_clean = re.sub(r"[^\d]", "", dob_raw)
+                if len(dob_clean) == 14:
+                    dob_clean = dob_clean[:8]
+                if len(dob_clean) == 8:
+                    if dob_clean[:4].startswith(("19", "20")):
+                        temp_pw = dob_clean[4:6] + dob_clean[6:8] + dob_clean[:4]
+                    else:
+                        temp_pw = dob_clean
                 else:
-                    temp_pwd = dob_clean  # already MMDDYYYY
-            else:
-                temp_pwd = dob_raw  # fallback to raw string
+                    temp_pw = dob_raw
 
             try:
+                # ── Step 1: Login with temp password ──────────────────────
                 driver.get(portal_url.strip())
-
-                # Log credentials being attempted
-                ui.log(f"  Entering credentials -> Username: {user} | Temp Password (DOB): {temp_pwd}")
+                ui.log(f"  Entering credentials -> UserID: {user_id} | Temp Password (DOB): {temp_pw}")
 
                 uf = wait.until(
                     EC.presence_of_element_located((
@@ -746,11 +771,11 @@ def run_new_client_password_setup(excel_path: str, portal_url: str, password: st
                     ))
                 )
                 uf.clear()
-                uf.send_keys(user)
+                uf.send_keys(user_id)
 
                 pf = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='password']")))
                 pf.clear()
-                pf.send_keys(temp_pwd)
+                pf.send_keys(temp_pw)
 
                 wait.until(
                     EC.element_to_be_clickable((
@@ -759,106 +784,138 @@ def run_new_client_password_setup(excel_path: str, portal_url: str, password: st
                     ))
                 ).click()
 
-                time.sleep(2.5)
-
-                # Check if login threw an error
+                # ── Step 2: Wait for password creation page ───────────────
+                time.sleep(2)
                 err_els = driver.find_elements(
                     By.XPATH,
                     "//*[contains(@class,'error') or contains(@id,'lblError') or contains(@id,'ErrMsg') or contains(@class,'alert-danger') or contains(@id,'Error')]"
                 )
                 visible_errors = [e.text.strip() for e in err_els if e.is_displayed() and e.text.strip()]
 
-                # Check for password reset fields
-                new_pwd_fields = driver.find_elements(
-                    By.XPATH,
-                    "//input[@type='password' and (contains(@id,'New') or contains(@name,'New') or contains(@id,'txtNewPwd') or contains(@placeholder,'New Password'))]"
+                try:
+                    wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='password']")))
+                    pw_fields = wait.until(lambda d: d.find_elements(By.XPATH, "//input[@type='password']"))
+                except TimeoutException:
+                    pw_fields = []
+
+                if len(pw_fields) < 2:
+                    if visible_errors:
+                        raise AssertionError(f"Login rejected: {visible_errors[0]}")
+                    raise AssertionError(f"Expected 2 password fields (New/Confirm), found {len(pw_fields)}")
+
+                # Fill New Password
+                pw_fields[0].clear()
+                pw_fields[0].send_keys(password)
+
+                # Fill Confirm Password
+                pw_fields[1].clear()
+                pw_fields[1].send_keys(password)
+
+                # ── Step 3: Security Question 1 ───────────────────────────
+                sq1 = wait.until(EC.presence_of_element_located((By.XPATH, "(//select)[1]")))
+                try:
+                    Select(sq1).select_by_visible_text("What was the make of your first car?")
+                except Exception:
+                    s1 = Select(sq1)
+                    matched1 = False
+                    for opt in s1.options:
+                        if "first car" in opt.text.lower():
+                            s1.select_by_visible_text(opt.text)
+                            matched1 = True
+                            break
+                    if not matched1 and len(s1.options) > 1:
+                        s1.select_by_index(1)
+
+                # Answer fields — grab visible text inputs after dropdowns are set
+                answer_fields = wait.until(lambda d: [
+                    f for f in d.find_elements(By.XPATH, "//input[@type='text']") if f.is_displayed()
+                ])
+                if len(answer_fields) < 2:
+                    raise AssertionError(f"Expected 2 answer fields, found {len(answer_fields)}")
+
+                answer_fields[0].clear()
+                answer_fields[0].send_keys("Audi")
+
+                # ── Step 4: Security Question 2 ───────────────────────────
+                sq2 = wait.until(EC.presence_of_element_located((By.XPATH, "(//select)[2]")))
+                try:
+                    Select(sq2).select_by_visible_text("In which town was your first job?")
+                except Exception:
+                    s2 = Select(sq2)
+                    matched2 = False
+                    for opt in s2.options:
+                        if "first job" in opt.text.lower():
+                            s2.select_by_visible_text(opt.text)
+                            matched2 = True
+                            break
+                    if not matched2 and len(s2.options) > 2:
+                        s2.select_by_index(2)
+                    elif not matched2 and len(s2.options) > 1:
+                        s2.select_by_index(1)
+
+                answer_fields[1].clear()
+                answer_fields[1].send_keys("Hgsi")
+
+                # ── Step 5: Submit ────────────────────────────────────────
+                submit_btn = wait.until(
+                    EC.element_to_be_clickable((
+                        By.XPATH,
+                        "//input[@value='Submit'] | //button[normalize-space()='Submit']"
+                    ))
                 )
+                submit_btn.click()
 
-                if visible_errors and not new_pwd_fields:
-                    err_msg = visible_errors[0]
-                    ui.log(f"FAIL {lbl} — Login rejected: {err_msg} | Temp Password used: {temp_pwd}", "fail")
-                    failed.append({"Username": user, "TempPassword": temp_pwd, "Reason": f"Login rejected: {err_msg}"})
-                    continue
-
-                if new_pwd_fields:
-                    new_pwd_fields[0].clear()
-                    new_pwd_fields[0].send_keys(password)
-
-                    confirm_fields = driver.find_elements(
-                        By.XPATH,
-                        "//input[@type='password' and (contains(@id,'Confirm') or contains(@name,'Confirm') or contains(@id,'txtConfirmPwd') or contains(@placeholder,'Confirm'))]"
+                # ── Step 6: Wait for success confirmation, then click Ok ───
+                try:
+                    ok_btn = WebDriverWait(driver, 10).until(
+                        EC.element_to_be_clickable((
+                            By.XPATH,
+                            "//input[@value='Ok' or @value='OK'] | "
+                            "//button[normalize-space()='Ok' or normalize-space()='OK']"
+                        ))
                     )
-                    if confirm_fields:
-                        confirm_fields[0].clear()
-                        confirm_fields[0].send_keys(password)
-
-                    # Security questions if present
-                    sec_selects = driver.find_elements(By.XPATH, "//select[contains(@id,'Question') or contains(@name,'Question') or contains(@id,'ddlSec')]")
-                    for s in sec_selects:
-                        try:
-                            sel = Select(s)
-                            if len(sel.options) > 1:
-                                sel.select_by_index(1)
-                        except Exception:
-                            pass
-
-                    sec_answers = driver.find_elements(By.XPATH, "//input[@type='text' and (contains(@id,'Answer') or contains(@name,'Answer') or contains(@id,'txtAnswer'))]")
-                    for ans_input in sec_answers:
-                        try:
-                            ans_input.clear()
-                            ans_input.send_keys("Workforce")
-                        except Exception:
-                            pass
-
-                    submit_btn = driver.find_elements(
-                        By.XPATH,
-                        "//input[@type='submit' or @value='Submit' or @value='Save' or @value='Continue'] | //button[contains(text(),'Submit') or contains(text(),'Save') or contains(text(),'Continue')]"
-                    )
-                    if submit_btn:
-                        submit_btn[0].click()
-                        time.sleep(2)
-
-                    # Re-check for post-submit errors
+                    ok_btn.click()
+                except TimeoutException:
                     post_errs = driver.find_elements(
                         By.XPATH,
                         "//*[contains(@class,'error') or contains(@id,'lblError') or contains(@id,'ErrMsg') or contains(@class,'alert-danger')]"
                     )
                     post_visible = [e.text.strip() for e in post_errs if e.is_displayed() and e.text.strip()]
                     if post_visible:
-                        ui.log(f"FAIL {lbl} — Password change error: {post_visible[0]}", "fail")
-                        failed.append({"Username": user, "Reason": post_visible[0]})
-                        continue
-
-                    ui.log(f"PASS {lbl} — Password setup completed", "pass")
-                    passed.append(user)
-
-                else:
-                    # Check if user is already logged into member dashboard
-                    logged_in_indicators = driver.find_elements(
-                        By.XPATH,
-                        "//*[contains(text(),'Logout') or contains(text(),'Log Out') or contains(text(),'Welcome') or contains(@id,'Dashboard') or contains(@id,'PopUp_LblMsg')]"
+                        raise AssertionError(f"Password change error: {post_visible[0]}")
+                    raise AssertionError(
+                        "No success confirmation ('Ok' button) appeared after Submit — "
+                        "password may NOT have been created (check for validation errors on page)"
                     )
-                    login_btn = driver.find_elements(By.XPATH, "//input[@value='Log In'] | //button[normalize-space()='Log In']")
-                    is_login_still_there = any(b.is_displayed() for b in login_btn)
 
-                    if logged_in_indicators and not is_login_still_there:
-                        ui.log(f"PASS {lbl} — Already configured (Logged in successfully)", "pass")
-                        passed.append(user)
-                    elif is_login_still_there:
-                        reason = visible_errors[0] if visible_errors else "Invalid credentials or temporary password rejected"
-                        ui.log(f"FAIL {lbl} — {reason} | Temp Password used: {temp_pwd}", "fail")
-                        failed.append({"Username": user, "TempPassword": temp_pwd, "Reason": reason})
-                    else:
-                        ui.log(f"PASS {lbl} — Setup step finished", "pass")
-                        passed.append(user)
+                # ── Step 7: Confirm we're back at login page before continuing ──
+                wait.until(
+                    EC.presence_of_element_located((
+                        By.XPATH,
+                        "//input[@type='text' and ("
+                        "@placeholder='Username' or @name='username' or "
+                        "@id='username' or @id='Username' or "
+                        "contains(translate(@id,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'user'))]"
+                    ))
+                )
 
+                ui.log(f"PASS {lbl} (temp: {temp_pw} → new password set)", "pass")
+                passed.append(user_id)
+
+            except TimeoutException:
+                r = f"Timed out — check URL or page flow (temp pw used: {temp_pw})"
+                ui.log(f"FAIL {lbl} — {r}", "fail")
+                failed.append({"UserID": user_id, "TempPassword": temp_pw, "Reason": r})
+            except AssertionError as e:
+                ui.log(f"FAIL {lbl} — {e}", "fail")
+                failed.append({"UserID": user_id, "TempPassword": temp_pw, "Reason": str(e)})
             except Exception as e:
                 err_str = str(e).splitlines()[0] if str(e) else type(e).__name__
                 ui.log(f"FAIL {lbl} — {err_str}", "fail")
-                failed.append({"Username": user, "TempPassword": temp_pwd, "Reason": err_str})
+                failed.append({"UserID": user_id, "TempPassword": temp_pw, "Reason": err_str})
 
             ui.progress((i / total) * 100)
-            ui.status(f"Processing {i}/{total} — {len(passed)} passed, {len(failed)} failed")
+            ui.status(f"Running {i}/{total} — {len(passed)} passed, {len(failed)} failed")
             time.sleep(1)
 
         ui.log("\n" + "=" * 65)
@@ -871,7 +928,7 @@ def run_new_client_password_setup(excel_path: str, portal_url: str, password: st
             ui.log("\nFAILED RECORDS:", "fail")
             for f in failed:
                 ui.log(
-                    f"  Username: {f['Username']} | Temp Password (DOB): {f.get('TempPassword', '-')} | Reason: {f['Reason']}",
+                    f"  UserID: {f['UserID']} | Temp Password (DOB): {f.get('TempPassword', '-')} | Reason: {f['Reason']}",
                     "fail"
                 )
             ui.status(f"Done — {len(passed)} passed, {len(failed)} failed", "fail")
